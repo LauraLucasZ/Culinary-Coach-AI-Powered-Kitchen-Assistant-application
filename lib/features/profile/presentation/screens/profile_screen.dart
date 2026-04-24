@@ -15,6 +15,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _authController = AuthController();
+  int _reloadToken = 0;
 
   Future<Map<String, dynamic>?> _getUserDoc(String uid) async {
     try {
@@ -66,17 +67,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onLogout: _logout,
             user: null,
             userData: null,
+            onEditProfileTap: null,
           );
         }
 
         return FutureBuilder<Map<String, dynamic>?>(
           future: _getUserDoc(currentUser.uid),
-          builder: (context, snapshot) => _ProfileScaffold(
-            authController: _authController,
-            onLogout: _logout,
-            user: currentUser,
-            userData: snapshot.data,
-          ),
+          key: ValueKey('profile-userdoc-$_reloadToken'),
+          builder: (context, snapshot) {
+            return _ProfileScaffold(
+              authController: _authController,
+              onLogout: _logout,
+              user: currentUser,
+              userData: snapshot.data,
+              onEditProfileTap: () async {
+                final result = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute<bool>(
+                    builder: (_) => EditProfileScreen(
+                      initialData: snapshot.data,
+                    ),
+                  ),
+                );
+                if (!mounted) return;
+                if (result == true) {
+                  setState(() => _reloadToken++);
+                }
+              },
+            );
+          },
         );
       },
     );
@@ -89,21 +107,20 @@ class _ProfileScaffold extends StatelessWidget {
     required this.onLogout,
     required this.user,
     required this.userData,
+    required this.onEditProfileTap,
   });
 
   final AuthController authController;
   final Future<void> Function() onLogout;
   final User? user;
   final Map<String, dynamic>? userData;
+  final Future<void> Function()? onEditProfileTap;
 
   @override
   Widget build(BuildContext context) {
     final topInset = MediaQuery.of(context).padding.top;
 
-    final resolvedEmail =
-        (userData?['email'] as String?)?.trim().isNotEmpty == true
-            ? (userData?['email'] as String).trim()
-            : (user?.email ?? '').trim();
+    final resolvedEmail = (user?.email ?? '').trim();
 
     final resolvedName = _resolveFullName(user: user, userData: userData);
 
@@ -367,15 +384,7 @@ class _ProfileScaffold extends StatelessWidget {
                             _ActionRow(
                               icon: Icons.edit_rounded,
                               label: 'Edit Profile',
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => EditProfileScreen(
-                                      initialData: userData,
-                                    ),
-                                  ),
-                                );
-                              },
+                              onTap: onEditProfileTap,
                             ),
                             const SizedBox(height: 6),
                             _ActionRow(

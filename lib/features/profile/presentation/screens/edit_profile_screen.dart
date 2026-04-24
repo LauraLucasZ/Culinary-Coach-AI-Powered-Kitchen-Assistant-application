@@ -95,8 +95,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     _firstNameController.text = readString('firstName', '');
     _lastNameController.text = readString('lastName', '');
-    final resolvedEmail = readString('email', (user?.email ?? '').trim());
-    _email = resolvedEmail;
+    _email = (user?.email ?? '').trim();
 
     _cookingLevel = readString('cookingLevel', 'Beginner');
     _favoriteCuisine = readString('favoriteCuisine', 'Not set');
