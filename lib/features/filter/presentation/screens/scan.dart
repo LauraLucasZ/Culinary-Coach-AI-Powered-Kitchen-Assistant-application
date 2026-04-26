@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
-import 'package:http_parser/http_parser.dart';
 
 class IngredientModel {
   final String name;
@@ -30,367 +29,217 @@ class _ScanScreenState extends State<ScanScreen> {
   bool isAnalyzing = false;
   List<IngredientModel>? scannedIngredients;
   String? errorMessage;
+
   final ImagePicker _picker = ImagePicker();
 
-  // LogMeal API credentials
-  static const String logMealApiToken = '45fa82180add2a3d2b6db4f47ff2a257279567c8';
-
-  // Common ingredients database for matching
-  final Map<String, List<String>> _ingredientsDatabase = {
-    'Vegetables': [
-      'tomato', 'onion', 'garlic', 'potato', 'carrot', 'cucumber', 'lettuce',
-      'spinach', 'broccoli', 'cauliflower', 'cabbage', 'celery', 'pepper',
-      'bell pepper', 'chili', 'eggplant', 'zucchini', 'pumpkin', 'squash',
-      'artichoke', 'asparagus', 'green beans', 'peas', 'corn', 'mushroom',
-      'radish', 'beetroot', 'leek', 'okra', 'molokhia'
-    ],
-    'Fruits': [
-      'apple', 'banana', 'orange', 'mango', 'grape', 'strawberry', 'blueberry',
-      'raspberry', 'blackberry', 'watermelon', 'cantaloupe', 'honeydew',
-      'pineapple', 'peach', 'pear', 'plum', 'apricot', 'cherry', 'kiwi',
-      'lemon', 'lime', 'grapefruit', 'pomegranate', 'fig', 'date', 'guava'
-    ],
-    'Grains': [
-      'rice', 'pasta', 'noodle', 'spaghetti', 'macaroni', 'bread', 'wheat',
-      'oat', 'barley', 'quinoa', 'couscous', 'bulgur', 'freekeh', 'corn',
-      'flour', 'semolina', 'vermicelli'
-    ],
-    'Legumes': [
-      'bean', 'lentil', 'chickpea', 'hummus', 'fava bean', 'kidney bean',
-      'black bean', 'white bean', 'soybean', 'tofu', 'tempeh', 'pea'
-    ],
-    'Meat': [
-      'chicken', 'beef', 'lamb', 'pork', 'turkey', 'duck', 'rabbit', 'goat',
-      'camel', 'veal', 'sausage', 'bacon', 'ham', 'meatball', 'steak'
-    ],
-    'Seafood': [
-      'fish', 'salmon', 'tuna', 'tilapia', 'shrimp', 'prawn', 'crab', 'lobster',
-      'calamari', 'squid', 'octopus', 'mussel', 'clam', 'oyster', 'sardine',
-      'mackerel', 'cod', 'sea bass', 'mullet'
-    ],
-    'Dairy': [
-      'milk', 'cheese', 'yogurt', 'butter', 'cream', 'ghee', 'labneh', 'feta',
-      'ricotta', 'mozzarella', 'parmesan', 'cheddar', 'goat cheese'
-    ],
-    'Spices & Condiments': [
-      'salt', 'pepper', 'cumin', 'coriander', 'cinnamon', 'turmeric', 'ginger',
-      'garlic powder', 'onion powder', 'paprika', 'chili powder', 'curry',
-      'oregano', 'thyme', 'rosemary', 'basil', 'mint', 'parsley', 'cilantro',
-      'dill', 'saffron', 'cardamom', 'clove', 'nutmeg', 'vanilla', 'sugar',
-      'honey', 'oil', 'olive oil', 'vinegar', 'soy sauce', 'hot sauce',
-      'ketchup', 'mustard', 'mayonnaise', 'tahini', 'molasses', 'syrup'
-    ]
-  };
+  // 🔥 IMPORTANT: Replace this with your actual OpenAI API Key
+  // Get your API key from: https://platform.openai.com/api-keys
+  final String apiKey = "YOUR_OPENAI_API_KEY_HERE";
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final crossAxisCount = screenWidth < 600 ? 2 : (screenWidth < 900 ? 3 : 4);
-    final childAspectRatio = screenWidth < 600 ? 0.85 : 0.9;
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF3E8DF),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF3E8DF),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF3A2214)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Scan Ingredients',
-          style: TextStyle(
-            color: Color(0xFF3A2214),
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              // Image display area
-              Container(
-                width: double.infinity,
-                height: 250,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(13),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: _image == null
-                    ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+      body: Stack(
+        children: [
+          _buildCameraPreview(),
+          _buildGradientOverlay(),
+          _buildTopBar(),
+          _buildScannerOverlay(),
+          _buildBottomControls(),
+
+          if (isAnalyzing)
+            Container(
+              color: Colors.black54,
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.image_outlined,
-                      size: 80,
-                      color: const Color(0xFFCB6B2E).withAlpha(100),
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF7A00)),
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'No image selected',
-                      style: TextStyle(
-                        color: Color(0xFF3A2214),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 16),
                     Text(
-                      'Take a photo of ingredients or a dish',
-                      style: TextStyle(
-                        color: const Color(0xFF3A2214).withAlpha(128),
-                        fontSize: 12,
-                      ),
+                      'Analyzing ingredients...',
+                      style: TextStyle(color: Colors.white),
                     ),
                   ],
-                )
-                    : ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Image.file(
-                    _image!,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: 250,
-                  ),
                 ),
               ),
+            ),
 
-              const SizedBox(height: 24),
+          if (scannedIngredients != null && scannedIngredients!.isNotEmpty)
+            _buildResultsSheet(),
 
-              // Buttons row
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildActionButton(
-                      icon: Icons.camera_alt,
-                      label: 'Camera',
-                      color: const Color(0xFFCB6B2E),
-                      onTap: () => _checkCameraPermissionAndPickImage(),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildActionButton(
-                      icon: Icons.photo_library,
-                      label: 'Gallery',
-                      color: const Color(0xFFDD8E1E),
-                      onTap: () => _checkStoragePermissionAndPickImage(),
-                    ),
-                  ),
-                ],
+          if (errorMessage != null)
+            _buildErrorSnackbar(),
+        ],
+      ),
+    );
+  }
+
+  // ================= UI =================
+
+  Widget _buildCameraPreview() {
+    return SizedBox.expand(
+      child: _image == null
+          ? Container(
+        color: Colors.black,
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.camera_alt, size: 64, color: Colors.grey),
+              SizedBox(height: 16),
+              Text(
+                'Take a photo of your ingredients',
+                style: TextStyle(color: Colors.grey),
               ),
-
-              const SizedBox(height: 24),
-
-              // Analyze button
-              if (_image != null && scannedIngredients == null)
-                Container(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: isAnalyzing ? null : _analyzeFoodImage,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFCB6B2E),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: isAnalyzing
-                        ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                        : const Text(
-                      'Identify Food & Ingredients',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-
-              // Error message
-              if (errorMessage != null) ...[
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withAlpha(20),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.red.withAlpha(50)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error_outline, color: Colors.red),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          errorMessage!,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              // Scanned Ingredients Grid
-              if (scannedIngredients != null && scannedIngredients!.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(8),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: const Color(0xFF5A9A44),
-                            size: 24,
-                          ),
-                          const SizedBox(width: 12),
-                          const Text(
-                            'Detected Ingredients',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF3A2214),
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${scannedIngredients!.length} ingredients',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: const Color(0xFFCB6B2E).withAlpha(180),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          childAspectRatio: childAspectRatio,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                        ),
-                        itemCount: scannedIngredients!.length,
-                        itemBuilder: (context, index) {
-                          final ingredient = scannedIngredients![index];
-                          return _IngredientCard(ingredient: ingredient);
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
-                                final ingredientsList = scannedIngredients!
-                                    .map((e) => e.name)
-                                    .toList();
-                                Navigator.pop(context, ingredientsList);
-                              },
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFFCB6B2E)),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(25),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              child: const Text(
-                                'Use These Ingredients',
-                                style: TextStyle(color: Color(0xFFCB6B2E)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  scannedIngredients = null;
-                                  _image = null;
-                                  errorMessage = null;
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFCB6B2E),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(25),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                              ),
-                              child: const Text('Scan New Image'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ],
           ),
         ),
+      )
+          : Image.file(_image!, fit: BoxFit.cover),
+    );
+  }
+
+  Widget _buildGradientOverlay() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.center,
+          colors: [
+            Colors.black.withOpacity(0.8),
+            Colors.transparent,
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildTopBar() {
+    return Positioned(
+      top: 50,
+      left: 20,
+      right: 20,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _circleButton(Icons.arrow_back, () => Navigator.pop(context)),
+          _circleButton(Icons.help_outline, () => _showHelpDialog()),
+        ],
+      ),
+    );
+  }
+
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('How to Scan'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('1. Take a clear photo of your ingredients'),
+            SizedBox(height: 8),
+            Text('2. Make sure ingredients are well-lit'),
+            SizedBox(height: 8),
+            Text('3. Place ingredients in the center frame'),
+            SizedBox(height: 8),
+            Text('4. Wait for AI to detect them'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _circleButton(IconData icon, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: color.withAlpha(20),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withAlpha(50)),
+          color: Colors.black.withOpacity(0.5),
+          shape: BoxShape.circle,
         ),
-        child: Column(
+        child: Icon(icon, color: Colors.white, size: 20),
+      ),
+    );
+  }
+
+  Widget _buildScannerOverlay() {
+    return Center(
+      child: Container(
+        width: 280,
+        height: 280,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(color: const Color(0xFFFF7A00), width: 3),
+        ),
+        child: Stack(
           children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(color: color, fontWeight: FontWeight.w600),
+            Positioned(
+              top: 10,
+              left: 10,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: const BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: Color(0xFFFF7A00), width: 3),
+                    left: BorderSide(color: Color(0xFFFF7A00), width: 3),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: const BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: Color(0xFFFF7A00), width: 3),
+                    right: BorderSide(color: Color(0xFFFF7A00), width: 3),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 10,
+              left: 10,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFFFF7A00), width: 3),
+                    left: BorderSide(color: Color(0xFFFF7A00), width: 3),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 10,
+              right: 10,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFFFF7A00), width: 3),
+                    right: BorderSide(color: Color(0xFFFF7A00), width: 3),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -398,381 +247,400 @@ class _ScanScreenState extends State<ScanScreen> {
     );
   }
 
-  // Permission handling
-  Future<void> _checkCameraPermissionAndPickImage() async {
-    PermissionStatus status = await Permission.camera.request();
-
-    if (status.isGranted) {
-      await _pickImage(ImageSource.camera);
-    } else if (status.isDenied) {
-      setState(() {
-        errorMessage = 'Camera permission is required to take photos';
-      });
-    } else if (status.isPermanentlyDenied) {
-      _showPermissionDialog('Camera');
-    }
-  }
-
-  Future<void> _checkStoragePermissionAndPickImage() async {
-    PermissionStatus status;
-
-    if (Platform.isAndroid) {
-      status = await Permission.photos.request();
-      if (!status.isGranted) {
-        status = await Permission.storage.request();
-      }
-    } else {
-      status = await Permission.photos.request();
-    }
-
-    if (status.isGranted) {
-      await _pickImage(ImageSource.gallery);
-    } else if (status.isPermanentlyDenied) {
-      _showPermissionDialog('Gallery');
-    } else {
-      setState(() {
-        errorMessage = 'Gallery permission is required';
-      });
-    }
-  }
-
-  void _showPermissionDialog(String permissionName) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('$permissionName Permission Required'),
-          content: Text(
-            'This app needs $permissionName permission to scan ingredients. Please enable it in app settings.',
+  Widget _buildBottomControls() {
+    return Positioned(
+      bottom: 40,
+      left: 20,
+      right: 20,
+      child: Column(
+        children: [
+          const Text(
+            "Place ingredient in the frame to identify it.",
+            style: TextStyle(color: Colors.white, fontSize: 14),
+            textAlign: TextAlign.center,
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                openAppSettings();
-              },
-              child: const Text('Open Settings'),
-            ),
-          ],
-        );
-      },
+          const SizedBox(height: 20),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.photo_library, color: Colors.white, size: 30),
+                onPressed: _pickFromGallery,
+              ),
+
+              GestureDetector(
+                onTap: _pickFromCamera,
+                child: Container(
+                  width: 70,
+                  height: 70,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFF7A00),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.camera_alt, color: Colors.white, size: 35),
+                ),
+              ),
+
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.white, size: 30),
+                onPressed: () {
+                  setState(() {
+                    _image = null;
+                    scannedIngredients = null;
+                    errorMessage = null;
+                  });
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
-      );
+  Widget _buildResultsSheet() {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        height: 350,
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "Detected Ingredients",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF3A2214)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    // Add to shopping list
+                    Navigator.pop(context, scannedIngredients?.map((i) => i.name).toList());
+                  },
+                  child: const Text(
+                    'Add All',
+                    style: TextStyle(color: Color(0xFFFF7A00), fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 15),
 
-      if (pickedFile != null) {
+            Expanded(
+              child: GridView.builder(
+                itemCount: scannedIngredients!.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  childAspectRatio: 0.9,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemBuilder: (_, i) {
+                  final ing = scannedIngredients![i];
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF7A00).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ing.imageUrl.isNotEmpty
+                            ? Image.network(
+                          ing.imageUrl,
+                          height: 50,
+                          width: 50,
+                          errorBuilder: (_, __, ___) => Container(
+                            height: 50,
+                            width: 50,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF7A00).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                            child: const Icon(Icons.food_bank, color: Color(0xFFFF7A00), size: 30),
+                          ),
+                        )
+                            : Container(
+                          height: 50,
+                          width: 50,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF7A00).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          child: const Icon(Icons.food_bank, color: Color(0xFFFF7A00), size: 30),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          ing.name,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF3A2214)),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF7A00).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            ing.category,
+                            style: const TextStyle(fontSize: 9, color: Color(0xFFFF7A00)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorSnackbar() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage ?? 'An error occurred'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'Dismiss',
+            textColor: Colors.white,
+            onPressed: () {
+              setState(() => errorMessage = null);
+            },
+          ),
+        ),
+      );
+    });
+    return const SizedBox.shrink();
+  }
+
+  // ================= IMAGE PICKING =================
+
+  Future<void> _pickFromCamera() async {
+    var status = await Permission.camera.status;
+    if (!status.isGranted) {
+      status = await Permission.camera.request();
+    }
+
+    if (status.isGranted) {
+      final file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 80);
+      if (file != null) {
         setState(() {
-          _image = File(pickedFile.path);
+          _image = File(file.path);
           scannedIngredients = null;
           errorMessage = null;
         });
+        _analyzeImage();
       }
-    } catch (e) {
+    } else {
       setState(() {
-        errorMessage = 'Error picking image: $e';
+        errorMessage = 'Camera permission is required to take photos';
       });
     }
   }
 
-  // ==================== IMPROVED INGREDIENT DETECTION ====================
+  Future<void> _pickFromGallery() async {
+    final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (file != null) {
+      setState(() {
+        _image = File(file.path);
+        scannedIngredients = null;
+        errorMessage = null;
+      });
+      _analyzeImage();
+    }
+  }
 
-  Future<void> _analyzeFoodImage() async {
+  // ================= AI ANALYSIS =================
+
+  Future<void> _analyzeImage() async {
     if (_image == null) return;
 
-    setState(() {
-      isAnalyzing = true;
-      errorMessage = null;
-    });
+    // Check if API key is configured
+    if (apiKey == "YOUR_OPENAI_API_KEY_HERE" || apiKey.isEmpty) {
+      setState(() {
+        errorMessage = 'Please configure your OpenAI API key in the code';
+        isAnalyzing = false;
+      });
+      return;
+    }
+
+    setState(() => isAnalyzing = true);
 
     try {
-      var uri = Uri.parse('https://api.logmeal.com/v2/recognition/complete');
+      // Compress image before sending
+      final bytes = await _image!.readAsBytes();
+      final base64Image = base64Encode(bytes);
 
-      var request = http.MultipartRequest('POST', uri);
-
-      request.headers.addAll({
-        'Authorization': 'Bearer $logMealApiToken',
-      });
-
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'image',
-          _image!.path,
-          contentType: MediaType('image', 'jpeg'),
-        ),
-      );
-
-      var response = await request.send();
-      var responseBody = await response.stream.bytesToString();
-
-      print("STATUS: ${response.statusCode}");
-      print("BODY: $responseBody");
-
-      if (response.statusCode == 200) {
-        final data = json.decode(responseBody);
-
-        // Extract ingredients from dish names
-        final detectedIngredients = await _extractIngredientsFromResults(data);
-
-        setState(() {
-          scannedIngredients = detectedIngredients;
-          isAnalyzing = false;
-        });
-
-      } else {
-        throw Exception("API Error ${response.statusCode}");
+      // Check image size (OpenAI has limits)
+      if (base64Image.length > 20 * 1024 * 1024) { // 20MB limit
+        throw Exception('Image too large. Please choose a smaller image.');
       }
 
-    } catch (e) {
+      // Using Chat Completions API with Vision capability
+      final response = await http.post(
+        Uri.parse("https://api.openai.com/v1/chat/completions"),
+        headers: {
+          "Authorization": "Bearer $apiKey",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "model": "gpt-4o-mini",
+          "messages": [
+            {
+              "role": "user",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "List all the ingredients you can see in this image. Return ONLY a valid JSON array of ingredient names as strings. Example format: [\"tomato\", \"onion\", \"garlic\"]. Do not include any other text or explanation. If you can't see any ingredients clearly, return an empty array []."
+                },
+                {
+                  "type": "image_url",
+                  "image_url": {
+                    "url": "data:image/jpeg;base64,$base64Image"
+                  }
+                }
+              ]
+            }
+          ],
+          "max_tokens": 500,
+          "temperature": 0.3,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode != 200) {
+        final errorData = jsonDecode(response.body);
+        throw Exception('API Error: ${errorData['error']['message'] ?? response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body);
+      final content = data['choices'][0]['message']['content'];
+
+      // Clean and parse the response
+      String cleanedContent = content.trim();
+
+      // Remove markdown code blocks if present
+      if (cleanedContent.startsWith('```json')) {
+        cleanedContent = cleanedContent.substring(7);
+      }
+      if (cleanedContent.startsWith('```')) {
+        cleanedContent = cleanedContent.substring(3);
+      }
+      if (cleanedContent.endsWith('```')) {
+        cleanedContent = cleanedContent.substring(0, cleanedContent.length - 3);
+      }
+
+      cleanedContent = cleanedContent.trim();
+
+      // If empty array or empty content
+      if (cleanedContent == '[]' || cleanedContent.isEmpty) {
+        throw Exception('No ingredients detected in the image');
+      }
+
+      // Parse the JSON array
+      final List<dynamic> ingredientList = jsonDecode(cleanedContent);
+
+      if (ingredientList.isEmpty) {
+        throw Exception('No ingredients detected in the image');
+      }
+
       setState(() {
-        errorMessage = 'Analysis failed: ${e.toString()}';
+        scannedIngredients = ingredientList.map((item) {
+          String name = item.toString().toLowerCase().trim();
+          return IngredientModel(
+            name: _capitalize(name),
+            imageUrl: _getIngredientImageUrl(name),
+            category: _getIngredientCategory(name),
+          );
+        }).toList();
+        isAnalyzing = false;
+      });
+
+    } on http.ClientException catch (e) {
+      print('Network error: $e');
+      setState(() {
+        errorMessage = 'Network error. Please check your internet connection.';
+        isAnalyzing = false;
+      });
+    } catch (e) {
+      print('Error analyzing image: $e');
+      setState(() {
+        errorMessage = _getUserFriendlyError(e);
         isAnalyzing = false;
       });
     }
   }
 
-  Future<List<IngredientModel>> _extractIngredientsFromResults(Map<String, dynamic> data) async {
-    Set<String> uniqueIngredients = {};
-
-    // Get dish names from recognition results
-    List<String> dishNames = [];
-    if (data['recognition_results'] != null) {
-      for (var item in data['recognition_results']) {
-        final dishName = item['name']?.toString().toLowerCase();
-        if (dishName != null && dishName.isNotEmpty) {
-          dishNames.add(dishName);
-          print("Detected dish: $dishName");
-        }
-      }
-    }
-
-    // Extract ingredients from each dish name
-    for (var dishName in dishNames) {
-      final ingredients = _parseDishNameToIngredients(dishName);
-      uniqueIngredients.addAll(ingredients);
-    }
-
-    // Also try to get ingredients from API if available
-    if (data['recognition_results'] != null) {
-      for (var item in data['recognition_results']) {
-        if (item['ingredients'] != null) {
-          for (var ing in item['ingredients']) {
-            final ingName = ing['name']?.toString();
-            if (ingName != null && ingName.isNotEmpty) {
-              uniqueIngredients.add(ingName);
-            }
-          }
-        }
-      }
-    }
-
-    // Convert to IngredientModel list
-    final ingredientsList = uniqueIngredients.map((name) {
-      return IngredientModel(
-        name: _capitalizeName(name),
-        imageUrl: _getIngredientImageUrl(name),
-        category: _getIngredientCategory(name),
-      );
-    }).toList();
-
-    // Sort alphabetically
-    ingredientsList.sort((a, b) => a.name.compareTo(b.name));
-
-    return ingredientsList;
-  }
-
-  List<String> _parseDishNameToIngredients(String dishName) {
-    Set<String> ingredients = {};
-    final dishLower = dishName.toLowerCase();
-
-    // Common dish mappings
-    final Map<String, List<String>> dishMappings = {
-      'hummus': ['chickpea', 'tahini', 'garlic', 'lemon', 'olive oil'],
-      'falafel': ['chickpea', 'parsley', 'garlic', 'onion', 'cumin'],
-      'koshari': ['rice', 'lentil', 'pasta', 'chickpea', 'tomato sauce', 'onion'],
-      'molokhia': ['molokhia', 'garlic', 'coriander', 'chicken broth'],
-      'mahshi': ['rice', 'onion', 'tomato', 'parsley', 'dill', 'eggplant', 'zucchini', 'cabbage'],
-      'tagine': ['meat', 'onion', 'garlic', 'cumin', 'turmeric', 'saffron', 'olive'],
-      'couscous': ['couscous', 'vegetable', 'chickpea', 'meat'],
-      'pasta': ['pasta', 'tomato sauce', 'garlic', 'onion', 'basil'],
-      'rice': ['rice'],
-      'salad': ['lettuce', 'tomato', 'cucumber', 'onion', 'olive oil'],
-      'soup': ['broth', 'vegetable', 'salt', 'pepper'],
-      'curry': ['curry powder', 'coconut milk', 'onion', 'garlic', 'ginger'],
-      'stew': ['meat', 'potato', 'carrot', 'onion', 'broth'],
-      'roast': ['meat', 'potato', 'carrot', 'rosemary', 'thyme'],
-      'grill': ['meat', 'salt', 'pepper', 'olive oil'],
-      'sandwich': ['bread', 'meat', 'lettuce', 'tomato', 'mayonnaise'],
-      'pizza': ['dough', 'tomato sauce', 'cheese', 'topping'],
-      'burger': ['bun', 'beef patty', 'lettuce', 'tomato', 'onion', 'pickle'],
-      'taco': ['tortilla', 'meat', 'lettuce', 'cheese', 'salsa'],
-      'sushi': ['rice', 'seaweed', 'fish', 'vegetable', 'soy sauce'],
-    };
-
-    // Check for exact dish matches
-    for (var entry in dishMappings.entries) {
-      if (dishLower.contains(entry.key)) {
-        ingredients.addAll(entry.value);
-        print("Matched dish '${entry.key}' -> ingredients: ${entry.value}");
-      }
-    }
-
-    // Also try to extract individual ingredient words
-    final words = dishLower.split(RegExp(r'[\s,]+'));
-    for (var word in words) {
-      // Check if word matches any known ingredient
-      for (var category in _ingredientsDatabase.values) {
-        for (var ingredient in category) {
-          if (word.contains(ingredient) || ingredient.contains(word)) {
-            if (word.length > 3 && ingredient.length > 3) {
-              ingredients.add(ingredient);
-              print("Extracted ingredient '$ingredient' from word '$word'");
-            }
-          }
-        }
-      }
-    }
-
-    // If no ingredients found, add the dish name as is
-    if (ingredients.isEmpty) {
-      ingredients.add(dishName);
-    }
-
-    return ingredients.toList();
-  }
-
-  String _getIngredientCategory(String ingredientName) {
-    final lowerName = ingredientName.toLowerCase();
-
-    for (var entry in _ingredientsDatabase.entries) {
-      for (var keyword in entry.value) {
-        if (lowerName.contains(keyword)) {
-          return entry.key;
-        }
-      }
-    }
-
-    return 'Other';
-  }
-
+  // Helper method to get ingredient images from reliable sources
   String _getIngredientImageUrl(String ingredientName) {
-    final formattedName = ingredientName.replaceAll(' ', '-');
-    return "https://www.themealdb.com/images/ingredients/$formattedName.png";
+    // Using The Meal DB API for ingredient images (free, no API key needed)
+    final encodedName = Uri.encodeComponent(ingredientName);
+    return "https://www.themealdb.com/images/ingredients/$encodedName.png";
   }
 
-  String _capitalizeName(String name) {
-    return name.split(' ').map((word) {
-      if (word.isEmpty) return word;
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
+  // Helper method to categorize ingredients
+  String _getIngredientCategory(String name) {
+    final vegetables = ['tomato', 'onion', 'garlic', 'potato', 'carrot', 'broccoli', 'spinach', 'lettuce', 'cucumber', 'pepper', 'celery', 'zucchini', 'cabbage', 'cauliflower', 'eggplant', 'pumpkin'];
+    final fruits = ['apple', 'banana', 'orange', 'grape', 'strawberry', 'mango', 'pineapple', 'watermelon', 'kiwi', 'peach', 'pear', 'lemon', 'lime', 'avocado', 'blueberry', 'raspberry'];
+    final meats = ['chicken', 'beef', 'pork', 'fish', 'shrimp', 'bacon', 'sausage', 'turkey', 'lamb', 'salmon', 'tuna', 'steak', 'ground beef', 'chicken breast'];
+    final dairy = ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'egg', 'eggs', 'sour cream', 'cream cheese'];
+    final grains = ['rice', 'bread', 'pasta', 'flour', 'oat', 'cereal', 'wheat', 'corn', 'quinoa', 'barley', 'noodle'];
+    final spices = ['salt', 'pepper', 'paprika', 'cumin', 'cinnamon', 'oregano', 'basil', 'thyme', 'rosemary', 'garlic powder', 'onion powder', 'chili powder'];
+    final legumes = ['bean', 'beans', 'lentil', 'lentils', 'chickpea', 'soy', 'tofu', 'edamame'];
+
+    name = name.toLowerCase();
+
+    if (vegetables.contains(name)) return 'Vegetable';
+    if (fruits.contains(name)) return 'Fruit';
+    if (meats.contains(name)) return 'Meat';
+    if (dairy.contains(name)) return 'Dairy';
+    if (grains.contains(name)) return 'Grain';
+    if (spices.contains(name)) return 'Spice';
+    if (legumes.contains(name)) return 'Legume';
+
+    return 'Ingredient';
   }
-}
 
-// Ingredient Card Widget
-class _IngredientCard extends StatelessWidget {
-  const _IngredientCard({
-    required this.ingredient,
-  });
+  String _getUserFriendlyError(dynamic error) {
+    String errorStr = error.toString().toLowerCase();
 
-  final IngredientModel ingredient;
+    if (errorStr.contains('401') || errorStr.contains('unauthorized') || errorStr.contains('api key')) {
+      return 'Invalid or missing API key. Please check your OpenAI API key configuration.';
+    } else if (errorStr.contains('429')) {
+      return 'Rate limit exceeded. Please try again in a few moments.';
+    } else if (errorStr.contains('500') || errorStr.contains('503')) {
+      return 'OpenAI server error. Please try again.';
+    } else if (errorStr.contains('no ingredients') || errorStr.contains('empty array')) {
+      return 'No ingredients detected. Please take a clearer photo with better lighting.';
+    } else if (errorStr.contains('socket') || errorStr.contains('network') || errorStr.contains('connection')) {
+      return 'Network error. Please check your internet connection and try again.';
+    } else if (errorStr.contains('timeout')) {
+      return 'Request timed out. Please check your connection and try again.';
+    } else if (errorStr.contains('image too large')) {
+      return 'Image is too large. Please choose a smaller image.';
+    } else {
+      return 'Failed to analyze image. Please try again.';
+    }
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final imageSize = screenWidth < 600 ? 70.0 : 80.0;
-    final fontSize = screenWidth < 600 ? 12.0 : 13.0;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFFCB6B2E).withOpacity(0.5),
-          width: 1.5,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: imageSize,
-            height: imageSize,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF3E8DF).withOpacity(0.5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                ingredient.imageUrl,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    Icons.restaurant,
-                    size: imageSize * 0.6,
-                    color: const Color(0xFFCB6B2E).withOpacity(0.7),
-                  );
-                },
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
-                          : null,
-                      strokeWidth: 2,
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFCB6B2E)),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              ingredient.name,
-              style: TextStyle(
-                color: const Color(0xFF3A2214),
-                fontSize: fontSize,
-                fontWeight: FontWeight.w600,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: const Color(0xFFCB6B2E).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              ingredient.category,
-              style: TextStyle(
-                color: const Color(0xFFCB6B2E),
-                fontSize: screenWidth < 600 ? 9 : 10,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
+  String _capitalize(String s) {
+    if (s.isEmpty) return s;
+    return s[0].toUpperCase() + s.substring(1);
   }
 }
