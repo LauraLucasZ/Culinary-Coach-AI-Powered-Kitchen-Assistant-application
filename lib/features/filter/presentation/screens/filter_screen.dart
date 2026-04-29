@@ -10,6 +10,7 @@ import 'package:culinary_coach_app/features/profile/presentation/screens/profile
 import 'package:culinary_coach_app/features/settings/presentation/screens/settings_screen.dart';
 import 'package:culinary_coach_app/features/filter/widgets/custom_image_cache.dart';
 import 'scan.dart' hide IngredientModel;
+import 'voice.dart';
 
 class FilterScreen extends StatefulWidget {
   const FilterScreen({super.key});
@@ -83,15 +84,33 @@ class _FilterScreenState extends State<FilterScreen> {
     }
   }
 
-  void toggleIngredient(IngredientModel ingredient) {
+  String? get _currentUserId => FirebaseAuth.instance.currentUser?.uid;
+
+  void _showAuthRequiredMessage() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please sign in to save your selected ingredients.'),
+        backgroundColor: _orangeDark,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> toggleIngredient(IngredientModel ingredient) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      _showAuthRequiredMessage();
+      return;
+    }
+
+    final isAlreadySelected =
+        selectedIngredientsMap.containsKey(ingredient.id) &&
+            selectedIngredientsMap[ingredient.id]!.isChecked;
+
     setState(() {
-      if (selectedIngredientsMap.containsKey(ingredient.id)) {
-        final current = selectedIngredientsMap[ingredient.id]!;
-        selectedIngredientsMap[ingredient.id] = SelectedIngredientData(
-          ingredient: ingredient,
-          quantity: current.quantity,
-          isChecked: !current.isChecked,
-        );
+      if (isAlreadySelected) {
+        selectedIngredientsMap.remove(ingredient.id);
       } else {
         selectedIngredientsMap[ingredient.id] = SelectedIngredientData(
           ingredient: ingredient,
@@ -100,27 +119,168 @@ class _FilterScreenState extends State<FilterScreen> {
         );
       }
     });
-  }
 
-  void updateQuantity(String ingredientId, double newQuantity) {
-    setState(() {
-      if (selectedIngredientsMap.containsKey(ingredientId)) {
-        final current = selectedIngredientsMap[ingredientId]!;
-        selectedIngredientsMap[ingredientId] = SelectedIngredientData(
-          ingredient: current.ingredient,
-          quantity: newQuantity.clamp(0.1, 100.0),
-          isChecked: current.isChecked,
+    try {
+      if (isAlreadySelected) {
+        await _ingredientService.deleteUserSelectedIngredient(
+          userId: userId,
+          ingredientId: ingredient.id,
+        );
+      } else {
+        await _ingredientService.saveUserSelectedIngredient(
+          userId: userId,
+          ingredient: ingredient,
+          quantity: 1.0,
         );
       }
+    } catch (e) {
+      debugPrint('Error updating selected ingredient: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not update ${ingredient.name}. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> updateQuantity(String ingredientId, double newQuantity) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      _showAuthRequiredMessage();
+      return;
+    }
+
+    if (!selectedIngredientsMap.containsKey(ingredientId)) return;
+
+    final current = selectedIngredientsMap[ingredientId]!;
+    final previousQuantity = current.quantity;
+    final safeQuantity = newQuantity.clamp(0.1, 100.0).toDouble();
+
+    // Update UI immediately first. Firestore is updated right after.
+    setState(() {
+      selectedIngredientsMap[ingredientId] = SelectedIngredientData(
+        ingredient: current.ingredient,
+        quantity: safeQuantity,
+        isChecked: current.isChecked,
+      );
     });
+
+    try {
+      await _ingredientService.updateUserSelectedIngredientQuantity(
+        userId: userId,
+        ingredientId: ingredientId,
+        quantity: safeQuantity,
+      );
+    } catch (e) {
+      debugPrint('Error updating quantity: $e');
+
+      // If saving fails, restore the old quantity so UI and database do not disagree.
+      if (mounted && selectedIngredientsMap.containsKey(ingredientId)) {
+        final latest = selectedIngredientsMap[ingredientId]!;
+        setState(() {
+          selectedIngredientsMap[ingredientId] = SelectedIngredientData(
+            ingredient: latest.ingredient,
+            quantity: previousQuantity,
+            isChecked: latest.isChecked,
+          );
+        });
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not update quantity. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
-  void removeIngredient(String ingredientId) {
+  double _currentDialogQuantity(String ingredientId, double fallback) {
+    final item = selectedIngredientsMap[ingredientId];
+    if (item == null) return fallback;
+    return item.quantity;
+  }
+
+  Future<void> _changeQuantityFromDialog({
+    required String ingredientId,
+    required double delta,
+    required VoidCallback refreshDialog,
+  }) async {
+    final currentItem = selectedIngredientsMap[ingredientId];
+    if (currentItem == null) return;
+
+    final newQuantity = (currentItem.quantity + delta).clamp(0.1, 100.0).toDouble();
+
+    // Refresh dialog immediately so one tap changes the number at once.
+    setState(() {
+      selectedIngredientsMap[ingredientId] = SelectedIngredientData(
+        ingredient: currentItem.ingredient,
+        quantity: newQuantity,
+        isChecked: currentItem.isChecked,
+      );
+    });
+    refreshDialog();
+
+    final userId = _currentUserId;
+    if (userId == null) {
+      _showAuthRequiredMessage();
+      return;
+    }
+
+    try {
+      await _ingredientService.updateUserSelectedIngredientQuantity(
+        userId: userId,
+        ingredientId: ingredientId,
+        quantity: newQuantity,
+      );
+    } catch (e) {
+      debugPrint('Error updating quantity: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not update quantity. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> removeIngredient(String ingredientId) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      _showAuthRequiredMessage();
+      return;
+    }
+
     setState(() => selectedIngredientsMap.remove(ingredientId));
+
+    try {
+      await _ingredientService.deleteUserSelectedIngredient(
+        userId: userId,
+        ingredientId: ingredientId,
+      );
+    } catch (e) {
+      debugPrint('Error removing ingredient: $e');
+    }
   }
 
-  void clearSelections() {
+  Future<void> clearSelections() async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      _showAuthRequiredMessage();
+      return;
+    }
+
     setState(() => selectedIngredientsMap.clear());
+
+    try {
+      await _ingredientService.clearUserSelectedIngredients(userId);
+    } catch (e) {
+      debugPrint('Error clearing ingredients: $e');
+    }
   }
 
 
@@ -136,26 +296,99 @@ class _FilterScreenState extends State<FilterScreen> {
     return [...firstEleven, '__more__'];
   }
 
-  List<IngredientModel> _applySearch(List<IngredientModel> ingredients) {
-    final query = searchQuery.trim().toLowerCase();
-    if (query.isEmpty) return ingredients;
+  String _normalizeSearchText(String value) {
+    return value
+        .toLowerCase()
+        .trim()
+        .replaceAll(RegExp(r'[^a-z0-9\s,/-]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
 
-    return ingredients.where((ingredient) {
-      final ingredientName = ingredient.name.toLowerCase();
-      final ingredientCategory = ingredient.category.toLowerCase();
+  List<String> _extractSearchTerms(String value) {
+    final normalized = _normalizeSearchText(value);
+    if (normalized.isEmpty) return [];
+
+    final stopWords = <String>{
+      'and',
+      'or',
+      'with',
+      'for',
+      'the',
+      'a',
+      'an',
+      'of',
+      'to',
+      'in',
+      'please',
+      'search',
+      'ingredient',
+      'ingredients',
+    };
+
+    // If the user writes: milk, chicken breast, rice
+    // keep comma-separated phrases together.
+    if (normalized.contains(',')) {
+      return normalized
+          .split(',')
+          .map((term) => term.trim())
+          .where((term) => term.isNotEmpty && !stopWords.contains(term))
+          .toSet()
+          .toList();
+    }
+
+    // If the user writes: milk chicken rice
+    // search each word separately so more ingredients can appear.
+    return normalized
+        .split(RegExp(r'\s+'))
+        .map((term) => term.trim())
+        .where((term) => term.length > 1 && !stopWords.contains(term))
+        .toSet()
+        .toList();
+  }
+
+  bool _ingredientMatchesAnySearchTerm({
+    required IngredientModel ingredient,
+    required List<String> terms,
+  }) {
+    if (terms.isEmpty) return true;
+
+    final ingredientName = _normalizeSearchText(ingredient.name);
+    final ingredientCategory = _normalizeSearchText(ingredient.category);
+
+    for (final term in terms) {
+      final normalizedTerm = _normalizeSearchText(term);
+      if (normalizedTerm.isEmpty) continue;
 
       // When a category is already opened, search only inside that category by ingredient name.
       if (selectedCategory != 'All') {
-        return ingredientName.contains(query);
+        if (ingredientName.contains(normalizedTerm)) return true;
+        continue;
       }
 
-      // When no specific category is selected, search globally and allow category matching too.
-      return ingredientName.contains(query) || ingredientCategory.contains(query);
+      // When no specific category is selected, search globally by ingredient name and category.
+      if (ingredientName.contains(normalizedTerm) || ingredientCategory.contains(normalizedTerm)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  List<IngredientModel> _applySearch(List<IngredientModel> ingredients) {
+    final terms = _extractSearchTerms(searchQuery);
+    if (terms.isEmpty) return ingredients;
+
+    return ingredients.where((ingredient) {
+      return _ingredientMatchesAnySearchTerm(ingredient: ingredient, terms: terms);
     }).toList();
   }
 
   String _openedTitle(List<IngredientModel> filteredIngredients) {
     if (selectedCategory != 'All') return selectedCategory;
+
+    final terms = _extractSearchTerms(searchQuery);
+    if (terms.length > 1) return 'Search Results';
 
     final query = searchQuery.trim().toLowerCase();
     if (query.isNotEmpty && filteredIngredients.isNotEmpty) {
@@ -228,6 +461,19 @@ class _FilterScreenState extends State<FilterScreen> {
     return map[key] ?? '';
   }
 
+  Future<void> _openVoiceSearch() async {
+    final spokenIngredient = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const VoiceSearchScreen()),
+    );
+
+    final value = spokenIngredient?.trim();
+    if (value == null || value.isEmpty) return;
+
+    _searchController.text = value;
+    _handleSearchChanged(value);
+  }
+
   Future<void> _openScan() async {
     final scannedIngredients = await Navigator.push(
       context,
@@ -235,7 +481,15 @@ class _FilterScreenState extends State<FilterScreen> {
     );
 
     if (scannedIngredients != null && scannedIngredients is List<IngredientModel>) {
+      final userId = _currentUserId;
+      if (userId == null) {
+        _showAuthRequiredMessage();
+        return;
+      }
+
       int addedCount = 0;
+      final ingredientsToSave = <IngredientModel>[];
+
       setState(() {
         for (final ingredient in scannedIngredients) {
           if (!selectedIngredientsMap.containsKey(ingredient.id)) {
@@ -244,10 +498,19 @@ class _FilterScreenState extends State<FilterScreen> {
               quantity: 1.0,
               isChecked: true,
             );
+            ingredientsToSave.add(ingredient);
             addedCount++;
           }
         }
       });
+
+      for (final ingredient in ingredientsToSave) {
+        await _ingredientService.saveUserSelectedIngredient(
+          userId: userId,
+          ingredient: ingredient,
+          quantity: 1.0,
+        );
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -328,7 +591,7 @@ class _FilterScreenState extends State<FilterScreen> {
                         itemBuilder: (context, index) {
                           final item = currentItems[index];
                           final ingredient = item.ingredient;
-                          final quantity = item.quantity;
+                          final quantity = _currentDialogQuantity(ingredient.id, item.quantity);
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 10),
@@ -363,10 +626,10 @@ class _FilterScreenState extends State<FilterScreen> {
                                       ),
                                     ),
                                     IconButton(
-                                      onPressed: () {
-                                        removeIngredient(ingredient.id);
+                                      onPressed: () async {
+                                        await removeIngredient(ingredient.id);
                                         setDialogState(() {});
-                                        if (selectedIngredientsMap.values.where((i) => i.isChecked).isEmpty) {
+                                        if (selectedIngredientsMap.values.where((i) => i.isChecked).isEmpty && context.mounted) {
                                           Navigator.pop(context);
                                         }
                                       },
@@ -389,8 +652,11 @@ class _FilterScreenState extends State<FilterScreen> {
                                         children: [
                                           IconButton(
                                             onPressed: () {
-                                              updateQuantity(ingredient.id, quantity - 0.5);
-                                              setDialogState(() {});
+                                              _changeQuantityFromDialog(
+                                                ingredientId: ingredient.id,
+                                                delta: -0.5,
+                                                refreshDialog: () => setDialogState(() {}),
+                                              );
                                             },
                                             icon: const Icon(Icons.remove, size: 16),
                                             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -406,8 +672,11 @@ class _FilterScreenState extends State<FilterScreen> {
                                           ),
                                           IconButton(
                                             onPressed: () {
-                                              updateQuantity(ingredient.id, quantity + 0.5);
-                                              setDialogState(() {});
+                                              _changeQuantityFromDialog(
+                                                ingredientId: ingredient.id,
+                                                delta: 0.5,
+                                                refreshDialog: () => setDialogState(() {}),
+                                              );
                                             },
                                             icon: const Icon(Icons.add, size: 16),
                                             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -428,9 +697,9 @@ class _FilterScreenState extends State<FilterScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () {
-                              clearSelections();
-                              Navigator.pop(context);
+                            onPressed: () async {
+                              await clearSelections();
+                              if (context.mounted) Navigator.pop(context);
                             },
                             style: OutlinedButton.styleFrom(
                               foregroundColor: _orangeDark,
@@ -508,220 +777,264 @@ class _FilterScreenState extends State<FilterScreen> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: _cream,
-      body: Column(
-        children: [
-          FutureBuilder<String?>(
-            future: currentUser == null ? Future<String?>.value(null) : _getFirestoreFirstName(currentUser.uid),
-            builder: (context, nameSnapshot) {
-              final resolvedName = (nameSnapshot.data != null && nameSnapshot.data!.isNotEmpty) ? nameSnapshot.data! : fallbackName;
-              return _PantryTopHeader(
-                displayName: resolvedName,
-                selectedCount: selectedCount,
-                searchController: _searchController,
-                onSearchChanged: _handleSearchChanged,
-                onFilterTap: () {},
-                onSettingsTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
-                onProfileTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileScreen())),
-                onSelectedTap: showSelectedIngredientsPopup,
-              );
-            },
-          ),
-          Expanded(
-            child: StreamBuilder<List<IngredientModel>>(
-              stream: selectedCategory == 'All' ? _ingredientService.getAllIngredients() : _ingredientService.getIngredientsByCategoryStream(selectedCategory),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                        const SizedBox(height: 16),
-                        Text('Error: ${snapshot.error}'),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _initializeIngredients,
-                          style: ElevatedButton.styleFrom(backgroundColor: _orangeDark),
-                          child: const Text('Retry', style: TextStyle(color: Colors.white)),
-                        ),
-                      ],
-                    ),
+    if (currentUser == null) {
+      return Scaffold(
+        backgroundColor: _cream,
+        body: Column(
+          children: [
+            _PantryTopHeader(
+              displayName: fallbackName,
+              selectedCount: 0,
+              searchController: _searchController,
+              onSearchChanged: _handleSearchChanged,
+              onFilterTap: _openVoiceSearch,
+              onSettingsTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
+              onProfileTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileScreen())),
+              onSelectedTap: showSelectedIngredientsPopup,
+            ),
+            const Expanded(
+              child: Center(
+                child: Text(
+                  'Please sign in to save selected ingredients.',
+                  style: TextStyle(color: _brown, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return StreamBuilder<List<SavedIngredientSelection>>(
+      stream: _ingredientService.streamUserSelectedIngredients(currentUser.uid),
+      builder: (context, selectedSnapshot) {
+        if (selectedSnapshot.hasData) {
+          selectedIngredientsMap = {
+            for (final selection in selectedSnapshot.data!)
+              selection.ingredient.id: SelectedIngredientData(
+                ingredient: selection.ingredient,
+                quantity: selection.quantity,
+                isChecked: true,
+              ),
+          };
+        }
+
+        return Scaffold(
+          backgroundColor: _cream,
+          body: Column(
+            children: [
+              FutureBuilder<String?>(
+                future: currentUser == null ? Future<String?>.value(null) : _getFirestoreFirstName(currentUser.uid),
+                builder: (context, nameSnapshot) {
+                  final resolvedName = (nameSnapshot.data != null && nameSnapshot.data!.isNotEmpty) ? nameSnapshot.data! : fallbackName;
+                  return _PantryTopHeader(
+                    displayName: resolvedName,
+                    selectedCount: selectedCount,
+                    searchController: _searchController,
+                    onSearchChanged: _handleSearchChanged,
+                    onFilterTap: _openVoiceSearch,
+                    onSettingsTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                    onProfileTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileScreen())),
+                    onSelectedTap: showSelectedIngredientsPopup,
                   );
-                }
-
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(_orangeDark)));
-                }
-
-                final ingredients = _applySearch(snapshot.data!);
-                final visibleCategories = _visibleCategoryTiles(categories);
-
-                return CustomScrollView(
-                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                  slivers: [
-                    if (!isCategoryOpened) ...[
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
-                          child: _ScanIngredientCard(onTap: _openScan),
+                },
+              ),
+              Expanded(
+                child: StreamBuilder<List<IngredientModel>>(
+                  stream: selectedCategory == 'All' ? _ingredientService.getAllIngredients() : _ingredientService.getIngredientsByCategoryStream(selectedCategory),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                            const SizedBox(height: 16),
+                            Text('Error: ${snapshot.error}'),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _initializeIngredients,
+                              style: ElevatedButton.styleFrom(backgroundColor: _orangeDark),
+                              child: const Text('Retry', style: TextStyle(color: Colors.white)),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(18, 0, 18, 6),
-                          child: Text(
-                            'Categories',
-                            style: TextStyle(color: _brown, fontSize: 18, fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
-                      SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
-                        sliver: SliverGrid(
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 4,
-                            childAspectRatio: 0.92,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                          ),
-                          delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                              final category = visibleCategories[index];
-                              final isMoreTile = category == '__more__';
-                              final isLessTile = category == '__less__';
-                              final isToggleTile = isMoreTile || isLessTile;
+                      );
+                    }
 
-                              return _CategoryTile(
-                                title: isMoreTile ? 'More' : isLessTile ? 'Less' : category,
-                                imagePath: isToggleTile ? '' : _categoryIconPath(category),
-                                icon: isMoreTile
-                                    ? Icons.more_horiz_rounded
-                                    : isLessTile
-                                    ? Icons.expand_less_rounded
-                                    : null,
-                                isSelected: false,
-                                onTap: isToggleTile
-                                    ? () => setState(() => showAllCategories = !showAllCategories)
-                                    : () => setState(() {
-                                  selectedCategory = category;
-                                  isCategoryOpened = true;
-                                  searchQuery = '';
-                                  _searchController.clear();
-                                }),
-                              );
-                            },
-                            childCount: visibleCategories.length,
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(_orangeDark)));
+                    }
+
+                    final ingredients = _applySearch(snapshot.data!);
+                    final visibleCategories = _visibleCategoryTiles(categories);
+
+                    return CustomScrollView(
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                      slivers: [
+                        if (!isCategoryOpened) ...[
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+                              child: _ScanIngredientCard(onTap: _openScan),
+                            ),
                           ),
-                        ),
-                      ),
-                      SliverToBoxAdapter(child: SizedBox(height: bottomSafePadding)),
-                    ] else ...[
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
-                          child: Row(
-                            children: [
-                              GestureDetector(
-                                onTap: () => setState(() {
-                                  isCategoryOpened = false;
-                                  selectedCategory = 'All';
-                                  searchQuery = '';
-                                  _searchController.clear();
-                                }),
-                                child: Container(
-                                  height: 38,
-                                  width: 38,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: _border),
-                                  ),
-                                  child: const Icon(Icons.arrow_back_rounded, color: _orangeDark, size: 22),
-                                ),
+                          const SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.fromLTRB(18, 0, 18, 6),
+                              child: Text(
+                                'Categories',
+                                style: TextStyle(color: _brown, fontSize: 18, fontWeight: FontWeight.w700),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
+                            ),
+                          ),
+                          SliverPadding(
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                            sliver: SliverGrid(
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 4,
+                                childAspectRatio: 0.92,
+                                crossAxisSpacing: 10,
+                                mainAxisSpacing: 10,
+                              ),
+                              delegate: SliverChildBuilderDelegate(
+                                    (context, index) {
+                                  final category = visibleCategories[index];
+                                  final isMoreTile = category == '__more__';
+                                  final isLessTile = category == '__less__';
+                                  final isToggleTile = isMoreTile || isLessTile;
+
+                                  return _CategoryTile(
+                                    title: isMoreTile ? 'More' : isLessTile ? 'Less' : category,
+                                    imagePath: isToggleTile ? '' : _categoryIconPath(category),
+                                    icon: isMoreTile
+                                        ? Icons.more_horiz_rounded
+                                        : isLessTile
+                                        ? Icons.expand_less_rounded
+                                        : null,
+                                    isSelected: false,
+                                    onTap: isToggleTile
+                                        ? () => setState(() => showAllCategories = !showAllCategories)
+                                        : () => setState(() {
+                                      selectedCategory = category;
+                                      isCategoryOpened = true;
+                                      searchQuery = '';
+                                      _searchController.clear();
+                                    }),
+                                  );
+                                },
+                                childCount: visibleCategories.length,
+                              ),
+                            ),
+                          ),
+                          SliverToBoxAdapter(child: SizedBox(height: bottomSafePadding)),
+                        ] else ...[
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+                              child: Row(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => setState(() {
+                                      isCategoryOpened = false;
+                                      selectedCategory = 'All';
+                                      searchQuery = '';
+                                      _searchController.clear();
+                                    }),
+                                    child: Container(
+                                      height: 38,
+                                      width: 38,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: _border),
+                                      ),
+                                      child: const Icon(Icons.arrow_back_rounded, color: _orangeDark, size: 22),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _openedTitle(ingredients),
+                                          style: const TextStyle(color: _brown, fontSize: 20, fontWeight: FontWeight.w800),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          searchQuery.trim().isEmpty
+                                              ? '${ingredients.length} ${ingredients.length == 1 ? 'ingredient' : 'ingredients'} available'
+                                              : '${ingredients.length} ${ingredients.length == 1 ? 'result' : 'results'} found',
+                                          style: const TextStyle(color: _mutedBrown, fontSize: 13, fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (selectedCount > 0)
+                                    GestureDetector(
+                                      onTap: showSelectedIngredientsPopup,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                        decoration: BoxDecoration(color: _orangeDark, borderRadius: BorderRadius.circular(18)),
+                                        child: Text(
+                                          '$selectedCount selected',
+                                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (ingredients.isEmpty)
+                            const SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: Center(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      _openedTitle(ingredients),
-                                      style: const TextStyle(color: _brown, fontSize: 20, fontWeight: FontWeight.w800),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      searchQuery.trim().isEmpty
-                                          ? '${ingredients.length} ${ingredients.length == 1 ? 'ingredient' : 'ingredients'} available'
-                                          : '${ingredients.length} ${ingredients.length == 1 ? 'result' : 'results'} found',
-                                      style: const TextStyle(color: _mutedBrown, fontSize: 13, fontWeight: FontWeight.w600),
-                                    ),
+                                    Icon(Icons.search_off, size: 54, color: _orangeDark),
+                                    SizedBox(height: 12),
+                                    Text('No ingredients found', style: TextStyle(color: _brown, fontSize: 16, fontWeight: FontWeight.w600)),
                                   ],
                                 ),
                               ),
-                              if (selectedCount > 0)
-                                GestureDetector(
-                                  onTap: showSelectedIngredientsPopup,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                                    decoration: BoxDecoration(color: _orangeDark, borderRadius: BorderRadius.circular(18)),
-                                    child: Text(
-                                      '$selectedCount selected',
-                                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-                                    ),
-                                  ),
+                            )
+                          else
+                            SliverPadding(
+                              padding: EdgeInsets.fromLTRB(18, 0, 18, bottomSafePadding),
+                              sliver: SliverGrid(
+                                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 165,
+                                  childAspectRatio: 0.75,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
                                 ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (ingredients.isEmpty)
-                        const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.search_off, size: 54, color: _orangeDark),
-                                SizedBox(height: 12),
-                                Text('No ingredients found', style: TextStyle(color: _brown, fontSize: 16, fontWeight: FontWeight.w600)),
-                              ],
+                                delegate: SliverChildBuilderDelegate(
+                                      (context, index) {
+                                    final ingredient = ingredients[index];
+                                    final isSelected = selectedIngredientsMap.containsKey(ingredient.id) && selectedIngredientsMap[ingredient.id]!.isChecked;
+                                    return _IngredientCard(
+                                      ingredient: ingredient,
+                                      isSelected: isSelected,
+                                      onTap: () => toggleIngredient(ingredient),
+                                    );
+                                  },
+                                  childCount: ingredients.length,
+                                ),
+                              ),
                             ),
-                          ),
-                        )
-                      else
-                        SliverPadding(
-                          padding: EdgeInsets.fromLTRB(18, 0, 18, bottomSafePadding),
-                          sliver: SliverGrid(
-                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 165,
-                              childAspectRatio: 0.75,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                            ),
-                            delegate: SliverChildBuilderDelegate(
-                                  (context, index) {
-                                final ingredient = ingredients[index];
-                                final isSelected = selectedIngredientsMap.containsKey(ingredient.id) && selectedIngredientsMap[ingredient.id]!.isChecked;
-                                return _IngredientCard(
-                                  ingredient: ingredient,
-                                  isSelected: isSelected,
-                                  onTap: () => toggleIngredient(ingredient),
-                                );
-                              },
-                              childCount: ingredients.length,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ],
-                );
-              },
-            ),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

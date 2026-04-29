@@ -25,8 +25,9 @@ class _ScanScreenState extends State<ScanScreen> {
 
   final ImagePicker _picker = ImagePicker();
 
-  // Replace with your OpenAI API Key
-  final String apiKey = "";
+  // Run with:
+  // flutter run --dart-define=OPENAI_API_KEY=your_api_key_here
+  static const String apiKey = String.fromEnvironment('OPENAI_API_KEY');
 
   @override
   Widget build(BuildContext context) {

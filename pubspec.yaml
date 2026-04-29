@@ -39,8 +39,8 @@ dependencies:
   firebase_auth: ^6.3.0
   google_sign_in: ^7.2.0
   cloud_firestore: ^6.2.0
-
-  # HTTP requests for API calls
+  record: ^6.0.0
+  path_provider: ^2.1.5
   http: ^1.1.0
 
   # Image picker for camera and gallery
