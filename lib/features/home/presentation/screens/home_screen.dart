@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
+import 'package:culinary_coach_app/core/widgets/current_user_avatar.dart';
 import 'package:culinary_coach_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:culinary_coach_app/features/settings/presentation/screens/settings_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -10,38 +11,34 @@ import 'package:flutter/material.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  Future<String?> _getFirestoreFirstName(String uid) async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
-      final data = doc.data();
-      final firstName = (data?['firstName'] as String?)?.trim();
-      if (firstName != null && firstName.isNotEmpty) return firstName;
-      return null;
-    } catch (_) {
-      return null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
     final fallbackName = _extractFirstName(currentUser?.displayName) ?? 'Chef';
 
     if (currentUser == null) {
-      return _HomeContent(displayName: fallbackName);
+      return const _HomeContent(displayName: 'Chef');
     }
 
-    return FutureBuilder<String?>(
-      future: _getFirestoreFirstName(currentUser.uid),
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .snapshots(),
       builder: (context, snapshot) {
+        final data = snapshot.data?.data();
+        final firstName = (data?['firstName'] as String?)?.trim();
         final resolvedName =
-            (snapshot.data != null && snapshot.data!.isNotEmpty)
-            ? snapshot.data!
-            : fallbackName;
-        return _HomeContent(displayName: resolvedName);
+            (firstName != null && firstName.isNotEmpty) ? firstName : fallbackName;
+
+        final url = (data?['profileImageUrl'] as String?)?.trim();
+        final localPath = (data?['profileImageLocalPath'] as String?)?.trim();
+
+        return _HomeContent(
+          displayName: resolvedName,
+          profileImageUrl: url,
+          profileImageLocalPath: localPath,
+        );
       },
     );
   }
@@ -54,9 +51,15 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _HomeContent extends StatelessWidget {
-  const _HomeContent({required this.displayName});
+  const _HomeContent({
+    required this.displayName,
+    this.profileImageUrl,
+    this.profileImageLocalPath,
+  });
 
   final String displayName;
+  final String? profileImageUrl;
+  final String? profileImageLocalPath;
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +69,8 @@ class _HomeContent extends StatelessWidget {
         children: [
           _HomeTopHero(
             displayName: displayName,
+            profileImageUrl: profileImageUrl,
+            profileImageLocalPath: profileImageLocalPath,
             onProfileTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(builder: (_) => const ProfileScreen()),
@@ -87,12 +92,16 @@ class _HomeContent extends StatelessWidget {
 class _HomeTopHero extends StatelessWidget {
   const _HomeTopHero({
     required this.displayName,
+    required this.profileImageUrl,
+    required this.profileImageLocalPath,
     required this.onProfileTap,
     required this.onSettingsTap,
     required this.onFilterTap,
   });
 
   final String displayName;
+  final String? profileImageUrl;
+  final String? profileImageLocalPath;
   final VoidCallback onProfileTap;
   final VoidCallback onSettingsTap;
   final VoidCallback onFilterTap;
@@ -127,10 +136,14 @@ class _HomeTopHero extends StatelessWidget {
                 children: [
                   GestureDetector(
                     onTap: onProfileTap,
-                    child: const CircleAvatar(
-                      radius: 20,
-                      backgroundColor: Color(0xFFD28E18),
-                      child: Icon(Icons.person, color: Colors.white, size: 22),
+                    child: CurrentUserAvatar(
+                      size: 40,
+                      onTap: onProfileTap,
+                      overrideImageUrl: profileImageUrl,
+                      overrideLocalPath: profileImageLocalPath,
+                      backgroundColor: const Color(0xFFD28E18),
+                      borderColor: Colors.white.withValues(alpha: 0.65),
+                      borderWidth: 2,
                     ),
                   ),
                   const SizedBox(width: 10),

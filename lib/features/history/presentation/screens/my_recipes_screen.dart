@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:culinary_coach_app/app/theme/app_colors.dart';
+import 'package:culinary_coach_app/core/widgets/current_user_avatar.dart';
 import 'package:culinary_coach_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:culinary_coach_app/features/settings/presentation/screens/settings_screen.dart';
-import 'package:culinary_coach_app/features/filter/presentation/screens/filter_screen.dart';
-import 'package:culinary_coach_app/features/filter/presentation/screens/scan.dart';
 
 class MyRecipesScreen extends StatefulWidget {
   const MyRecipesScreen({super.key});
@@ -873,10 +871,12 @@ class _MyRecipesHero extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: onProfileTap,
-                child: const CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Color(0xFFD28E18),
-                  child: Icon(Icons.person, color: Colors.white, size: 18),
+                child: CurrentUserAvatar(
+                  size: 32,
+                  onTap: onProfileTap,
+                  backgroundColor: const Color(0xFFD28E18),
+                  borderColor: Colors.white.withValues(alpha: 0.65),
+                  borderWidth: 2,
                 ),
               ),
               const SizedBox(width: 8),

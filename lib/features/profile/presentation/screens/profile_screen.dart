@@ -3,8 +3,13 @@ import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:culinary_coach_app/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:culinary_coach_app/features/profile/presentation/screens/edit_profile_screen.dart';
+import 'package:culinary_coach_app/core/widgets/current_user_avatar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:culinary_coach_app/features/profile/presentation/screens/change_password_screen.dart';
+import 'dart:typed_data';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,6 +21,78 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final _authController = AuthController();
   int _reloadToken = 0;
+  Uint8List? _localAvatarBytes;
+  String? _localAvatarPath;
+  bool _isAvatarUploading = false;
+
+  Future<void> _onAvatarTap(User currentUser) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1024,
+    );
+    if (picked == null) return;
+
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _localAvatarPath = picked.path;
+      _localAvatarBytes = bytes;
+      _isAvatarUploading = true;
+    });
+
+    final uid = currentUser.uid;
+    final effectiveLocalPath = picked.path;
+
+    try {
+      final ref = FirebaseStorage.instance.ref('users/$uid/profile.jpg');
+      await ref.putData(bytes);
+      final url = await ref.getDownloadURL();
+
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'profileImageUrl': url,
+        'profileImageLocalPath': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      try {
+        await currentUser.updatePhotoURL(url);
+      } catch (_) {
+        // Non-blocking.
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile picture updated.')),
+      );
+      setState(() {
+        _isAvatarUploading = false;
+        _localAvatarBytes = null;
+        _reloadToken++;
+      });
+      return;
+    } catch (_) {
+      // Firebase Storage not available or upload failed.
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(uid).set({
+          'profileImageLocalPath': effectiveLocalPath,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (_) {
+        // ignore
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saved profile picture locally.')),
+      );
+      setState(() {
+        _isAvatarUploading = false;
+        _reloadToken++;
+      });
+    }
+  }
 
   Future<Map<String, dynamic>?> _getUserDoc(String uid) async {
     try {
@@ -67,6 +144,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onLogout: _logout,
             user: null,
             userData: null,
+            localAvatarBytes: null,
+            localAvatarPath: null,
+            isAvatarUploading: false,
+            onAvatarTap: null,
             onEditProfileTap: null,
           );
         }
@@ -80,6 +161,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onLogout: _logout,
               user: currentUser,
               userData: snapshot.data,
+              localAvatarBytes: _localAvatarBytes,
+              localAvatarPath: _localAvatarPath,
+              isAvatarUploading: _isAvatarUploading,
+              onAvatarTap: () => _onAvatarTap(currentUser),
               onEditProfileTap: () async {
                 final result = await Navigator.of(context).push<bool>(
                   MaterialPageRoute<bool>(
@@ -107,6 +192,10 @@ class _ProfileScaffold extends StatelessWidget {
     required this.onLogout,
     required this.user,
     required this.userData,
+    required this.localAvatarBytes,
+    required this.localAvatarPath,
+    required this.isAvatarUploading,
+    required this.onAvatarTap,
     required this.onEditProfileTap,
   });
 
@@ -114,6 +203,10 @@ class _ProfileScaffold extends StatelessWidget {
   final Future<void> Function() onLogout;
   final User? user;
   final Map<String, dynamic>? userData;
+  final Uint8List? localAvatarBytes;
+  final String? localAvatarPath;
+  final bool isAvatarUploading;
+  final VoidCallback? onAvatarTap;
   final Future<void> Function()? onEditProfileTap;
 
   @override
@@ -123,6 +216,9 @@ class _ProfileScaffold extends StatelessWidget {
     final resolvedEmail = (user?.email ?? '').trim();
 
     final resolvedName = _resolveFullName(user: user, userData: userData);
+    final firestoreImageUrl = (userData?['profileImageUrl'] as String?)?.trim();
+    final firestoreLocalPath =
+        (userData?['profileImageLocalPath'] as String?)?.trim();
 
     final cookingLevel =
         _readString(userData, keys: ['cookingLevel', 'level', 'skillLevel']) ??
@@ -199,7 +295,26 @@ class _ProfileScaffold extends StatelessWidget {
                       const SizedBox(height: 14),
                       Row(
                         children: [
-                          _ProfileAvatar(photoUrl: user?.photoURL),
+                          CurrentUserAvatar(
+                            size: 62,
+                            onTap: onAvatarTap,
+                            isLoadingOverlay: isAvatarUploading,
+                            overrideImageBytes: localAvatarBytes,
+                            overrideImageUrl: (firestoreImageUrl != null &&
+                                    firestoreImageUrl.isNotEmpty)
+                                ? firestoreImageUrl
+                                : null,
+                            overrideLocalPath: (localAvatarPath != null &&
+                                    localAvatarPath!.trim().isNotEmpty)
+                                ? localAvatarPath!.trim()
+                                : ((firestoreLocalPath != null &&
+                                        firestoreLocalPath.isNotEmpty)
+                                    ? firestoreLocalPath
+                                    : null),
+                            backgroundColor: const Color(0xFFD28E18),
+                            borderColor: Colors.white.withValues(alpha: 0.7),
+                            borderWidth: 2,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -390,7 +505,14 @@ class _ProfileScaffold extends StatelessWidget {
                             _ActionRow(
                               icon: Icons.lock_rounded,
                               label: 'Change Password',
-                              onTap: () => _comingSoon(context),
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        const ChangePasswordScreen(),
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(height: 6),
                             _ActionRow(
@@ -503,11 +625,6 @@ class _ProfileScaffold extends StatelessWidget {
     return '$y-$m-$d';
   }
 
-  void _comingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Coming soon.')),
-    );
-  }
 }
 
 class _CircleIconButton extends StatelessWidget {
@@ -536,32 +653,6 @@ class _CircleIconButton extends StatelessWidget {
           ],
         ),
         child: Icon(icon, color: const Color(0xFF6C6C6C), size: 22),
-      ),
-    );
-  }
-}
-
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({required this.photoUrl});
-
-  final String? photoUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final url = (photoUrl ?? '').trim();
-
-    return Container(
-      height: 62,
-      width: 62,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: const Color(0xFFD28E18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 2),
-      ),
-      child: ClipOval(
-        child: url.isEmpty
-            ? const Icon(Icons.person, color: Colors.white, size: 32)
-            : Image.network(url, fit: BoxFit.cover),
       ),
     );
   }
