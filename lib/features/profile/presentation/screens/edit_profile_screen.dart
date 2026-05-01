@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
+import 'package:culinary_coach_app/core/utils/text_keywords.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -143,6 +144,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final payload = <String, dynamic>{
         'firstName': firstName,
         'lastName': lastName,
+        'displayName': '$firstName $lastName'.trim(),
+        'displayNameLower': '$firstName $lastName'.trim().toLowerCase(),
+        'nameKeywords': buildSearchKeywords('$firstName $lastName'),
         'cookingLevel': _cookingLevel,
         'favoriteCuisine': _favoriteCuisine,
         'dietaryPreference': _dietaryPreference,

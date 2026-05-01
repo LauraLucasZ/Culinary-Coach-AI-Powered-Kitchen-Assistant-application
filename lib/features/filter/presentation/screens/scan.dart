@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print, deprecated_member_use, unnecessary_underscores
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -422,23 +423,25 @@ class _ScanScreenState extends State<ScanScreen> {
       print('Original image: ${image.width}x${image.height}, ${bytes.length / 1024} KB');
 
       const int maxDimension = 4096;
-      img.Image? processedImage = image;
+      img.Image processedImage = image;
 
       if (image.width > maxDimension || image.height > maxDimension) {
         if (image.width >= image.height) {
           final targetWidth = maxDimension;
           final targetHeight = (image.height * maxDimension / image.width).round();
-          processedImage = img.copyResize(image, width: targetWidth, height: targetHeight);
-          print('Resized to: ${processedImage!.width}x${processedImage.height}');
+          processedImage =
+              img.copyResize(image, width: targetWidth, height: targetHeight);
+          print('Resized to: ${processedImage.width}x${processedImage.height}');
         } else {
           final targetHeight = maxDimension;
           final targetWidth = (image.width * maxDimension / image.height).round();
-          processedImage = img.copyResize(image, width: targetWidth, height: targetHeight);
-          print('Resized to: ${processedImage!.width}x${processedImage.height}');
+          processedImage =
+              img.copyResize(image, width: targetWidth, height: targetHeight);
+          print('Resized to: ${processedImage.width}x${processedImage.height}');
         }
       }
 
-      final jpegBytes = img.encodeJpg(processedImage!, quality: 95);
+      final jpegBytes = img.encodeJpg(processedImage, quality: 95);
       final tempFile = File(originalFile.path);
       await tempFile.writeAsBytes(jpegBytes);
 

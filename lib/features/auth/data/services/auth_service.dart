@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:culinary_coach_app/core/utils/text_keywords.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -216,6 +217,21 @@ class AuthService {
       payload['lastName'] = (lastName == null || lastName.trim().isEmpty)
           ? null
           : lastName.trim();
+    }
+
+    final resolvedFirst =
+        (payload['firstName'] as String?) ?? (existingData['firstName'] as String?);
+    final resolvedLast =
+        (payload['lastName'] as String?) ?? (existingData['lastName'] as String?);
+    final displayName = [
+      if (resolvedFirst != null && resolvedFirst.trim().isNotEmpty)
+        resolvedFirst.trim(),
+      if (resolvedLast != null && resolvedLast.trim().isNotEmpty) resolvedLast.trim(),
+    ].join(' ').trim();
+    if (displayName.isNotEmpty) {
+      payload['displayName'] = displayName;
+      payload['displayNameLower'] = displayName.toLowerCase();
+      payload['nameKeywords'] = buildSearchKeywords(displayName);
     }
 
     await doc.set(payload, SetOptions(merge: true));

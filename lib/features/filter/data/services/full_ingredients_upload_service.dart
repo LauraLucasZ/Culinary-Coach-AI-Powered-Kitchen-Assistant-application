@@ -1,4 +1,5 @@
 // lib/features/filter/data/services/full_ingredients_upload_service.dart
+// ignore_for_file: avoid_print, avoid_types_as_parameter_names
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/features/filter/data/domain/halal_ingredients_database.dart';
 

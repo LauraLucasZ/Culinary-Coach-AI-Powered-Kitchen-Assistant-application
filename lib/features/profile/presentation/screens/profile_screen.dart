@@ -4,6 +4,8 @@ import 'package:culinary_coach_app/features/auth/presentation/controllers/auth_c
 import 'package:culinary_coach_app/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:culinary_coach_app/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:culinary_coach_app/core/widgets/current_user_avatar.dart';
+import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
+import 'package:culinary_coach_app/features/community/presentation/widgets/community_post_card.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +14,10 @@ import 'package:culinary_coach_app/features/profile/presentation/screens/change_
 import 'dart:typed_data';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.userId});
+
+  /// If provided and different from current user, shows the public profile view.
+  final String? userId;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -134,16 +139,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
+    final targetUid = widget.userId ?? currentUser?.uid;
+    final isPrivateView =
+        (targetUid != null && currentUser != null && targetUid == currentUser.uid);
 
     return AnimatedBuilder(
       animation: _authController,
       builder: (context, _) {
-        if (currentUser == null) {
+        if (currentUser == null || targetUid == null) {
           return _ProfileScaffold(
             authController: _authController,
             onLogout: _logout,
             user: null,
             userData: null,
+            isPrivateView: true,
+            viewerUid: null,
+            targetUid: null,
             localAvatarBytes: null,
             localAvatarPath: null,
             isAvatarUploading: false,
@@ -153,18 +164,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
 
         return FutureBuilder<Map<String, dynamic>?>(
-          future: _getUserDoc(currentUser.uid),
-          key: ValueKey('profile-userdoc-$_reloadToken'),
+          future: _getUserDoc(targetUid),
+          key: ValueKey('profile-userdoc-$targetUid-$_reloadToken'),
           builder: (context, snapshot) {
             return _ProfileScaffold(
               authController: _authController,
               onLogout: _logout,
               user: currentUser,
               userData: snapshot.data,
+              isPrivateView: isPrivateView,
+              viewerUid: currentUser.uid,
+              targetUid: targetUid,
               localAvatarBytes: _localAvatarBytes,
               localAvatarPath: _localAvatarPath,
               isAvatarUploading: _isAvatarUploading,
-              onAvatarTap: () => _onAvatarTap(currentUser),
+              onAvatarTap: isPrivateView ? () => _onAvatarTap(currentUser) : null,
               onEditProfileTap: () async {
                 final result = await Navigator.of(context).push<bool>(
                   MaterialPageRoute<bool>(
@@ -192,6 +206,9 @@ class _ProfileScaffold extends StatelessWidget {
     required this.onLogout,
     required this.user,
     required this.userData,
+    required this.isPrivateView,
+    required this.viewerUid,
+    required this.targetUid,
     required this.localAvatarBytes,
     required this.localAvatarPath,
     required this.isAvatarUploading,
@@ -203,6 +220,9 @@ class _ProfileScaffold extends StatelessWidget {
   final Future<void> Function() onLogout;
   final User? user;
   final Map<String, dynamic>? userData;
+  final bool isPrivateView;
+  final String? viewerUid;
+  final String? targetUid;
   final Uint8List? localAvatarBytes;
   final String? localAvatarPath;
   final bool isAvatarUploading;
@@ -213,7 +233,7 @@ class _ProfileScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final topInset = MediaQuery.of(context).padding.top;
 
-    final resolvedEmail = (user?.email ?? '').trim();
+    final resolvedEmail = isPrivateView ? (user?.email ?? '').trim() : '';
 
     final resolvedName = _resolveFullName(user: user, userData: userData);
     final firestoreImageUrl = (userData?['profileImageUrl'] as String?)?.trim();
@@ -251,6 +271,12 @@ class _ProfileScaffold extends StatelessWidget {
     final statsMyRecipes = _readInt(userData, keys: ['myRecipes', 'recipesCount']);
     final statsPosts =
         _readInt(userData, keys: ['communityPosts', 'postsCount']);
+
+    final followersCount = _readInt(userData, keys: ['followersCount']) ?? 0;
+    final followingCount = _readInt(userData, keys: ['followingCount']) ?? 0;
+    final likesCount = _readInt(userData, keys: ['likesCount']) ?? 0;
+
+    final repo = CommunityRepository();
 
     return Scaffold(
       body: Stack(
@@ -290,6 +316,34 @@ class _ProfileScaffold extends StatelessWidget {
                             onTap: () => Navigator.of(context).maybePop(),
                           ),
                           const Spacer(),
+                          if (!isPrivateView &&
+                              viewerUid != null &&
+                              targetUid != null &&
+                              viewerUid != targetUid)
+                            StreamBuilder<bool>(
+                              stream: repo.watchIsFollowing(
+                                viewerUid: viewerUid!,
+                                targetUid: targetUid!,
+                              ),
+                              builder: (context, snap) {
+                                final following = snap.data ?? false;
+                                return _HeaderActionButton(
+                                  label: following ? 'Unfollow' : 'Follow',
+                                  icon: following
+                                      ? Icons.person_remove_alt_1_rounded
+                                      : Icons.person_add_alt_1_rounded,
+                                  onTap: () async {
+                                    if (following) {
+                                      await repo.unfollowUser(
+                                        targetUid: targetUid!,
+                                      );
+                                    } else {
+                                      await repo.followUser(targetUid: targetUid!);
+                                    }
+                                  },
+                                );
+                              },
+                            ),
                         ],
                       ),
                       const SizedBox(height: 14),
@@ -368,31 +422,46 @@ class _ProfileScaffold extends StatelessWidget {
                   child: Column(
                     children: [
                       _SectionCard(
+                        title: 'Social',
+                        child: _InlineStatsRow(
+                          items: [
+                            _InlineStatItem(
+                              icon: Icons.group_add_rounded,
+                              value: _formatCount(followersCount),
+                              label: 'Followers',
+                            ),
+                            _InlineStatItem(
+                              icon: Icons.how_to_reg_rounded,
+                              value: _formatCount(followingCount),
+                              label: 'Following',
+                            ),
+                            _InlineStatItem(
+                              icon: Icons.favorite_rounded,
+                              value: _formatCount(likesCount),
+                              label: 'Likes',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _SectionCard(
                         title: 'Activity',
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _StatTile(
-                                label: 'Saved Recipes',
-                                value: _formatCount(statsSaved),
-                                icon: Icons.bookmark_rounded,
-                              ),
+                        child: _InlineStatsRow(
+                          items: [
+                            _InlineStatItem(
+                              icon: Icons.bookmark_rounded,
+                              value: _formatCount(statsSaved),
+                              label: 'Saved',
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _StatTile(
-                                label: 'My Recipes',
-                                value: _formatCount(statsMyRecipes),
-                                icon: Icons.restaurant_menu_rounded,
-                              ),
+                            _InlineStatItem(
+                              icon: Icons.restaurant_menu_rounded,
+                              value: _formatCount(statsMyRecipes),
+                              label: 'My Recipes',
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _StatTile(
-                                label: 'Community Posts',
-                                value: _formatCount(statsPosts),
-                                icon: Icons.forum_rounded,
-                              ),
+                            _InlineStatItem(
+                              icon: Icons.forum_rounded,
+                              value: _formatCount(statsPosts),
+                              label: 'Posts',
                             ),
                           ],
                         ),
@@ -419,121 +488,174 @@ class _ProfileScaffold extends StatelessWidget {
                               value: dietaryPreference,
                               icon: Icons.eco_rounded,
                             ),
-                            const SizedBox(height: 10),
-                            _InfoRow(
-                              label: 'Allergies',
-                              value: allergies,
-                              icon: Icons.health_and_safety_rounded,
-                            ),
-                            const SizedBox(height: 10),
-                            _InfoRow(
-                              label: 'Spice Tolerance',
-                              value: spiceTolerance,
-                              icon: Icons.local_fire_department_rounded,
-                            ),
+                            if (isPrivateView) ...[
+                              const SizedBox(height: 10),
+                              _InfoRow(
+                                label: 'Allergies',
+                                value: allergies,
+                                icon: Icons.health_and_safety_rounded,
+                              ),
+                              const SizedBox(height: 10),
+                              _InfoRow(
+                                label: 'Spice Tolerance',
+                                value: spiceTolerance,
+                                icon: Icons.local_fire_department_rounded,
+                              ),
+                            ],
                           ],
                         ),
                       ),
                       const SizedBox(height: 14),
-                      _SectionCard(
-                        title: 'Practical Cooking Settings',
-                        child: Column(
-                          children: [
-                            _InfoRow(
-                              label: 'Available Cooking Time',
-                              value: availableCookingTime,
-                              icon: Icons.schedule_rounded,
-                            ),
-                            const SizedBox(height: 10),
-                            _InfoRow(
-                              label: 'Serving Size Preference',
-                              value: servingSizePreference,
-                              icon: Icons.groups_rounded,
-                            ),
-                            const SizedBox(height: 10),
-                            _InfoRow(
-                              label: 'Kitchen Equipment',
-                              value: kitchenEquipment,
-                              icon: Icons.kitchen_rounded,
-                            ),
-                            const SizedBox(height: 10),
-                            _InfoRow(
-                              label: 'Budget Preference',
-                              value: budgetPreference,
-                              icon: Icons.payments_rounded,
-                            ),
-                          ],
+                      if (isPrivateView) ...[
+                        _SectionCard(
+                          title: 'Practical Cooking Settings',
+                          child: Column(
+                            children: [
+                              _InfoRow(
+                                label: 'Available Cooking Time',
+                                value: availableCookingTime,
+                                icon: Icons.schedule_rounded,
+                              ),
+                              const SizedBox(height: 10),
+                              _InfoRow(
+                                label: 'Serving Size Preference',
+                                value: servingSizePreference,
+                                icon: Icons.groups_rounded,
+                              ),
+                              const SizedBox(height: 10),
+                              _InfoRow(
+                                label: 'Kitchen Equipment',
+                                value: kitchenEquipment,
+                                icon: Icons.kitchen_rounded,
+                              ),
+                              const SizedBox(height: 10),
+                              _InfoRow(
+                                label: 'Budget Preference',
+                                value: budgetPreference,
+                                icon: Icons.payments_rounded,
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 14),
+                      ],
+                      const SizedBox(height: 14),
+                      if (isPrivateView) ...[
+                        _SectionCard(
+                          title: 'Nutrition Goals',
+                          child: Column(
+                            children: [
+                              _InfoRow(
+                                label: 'Nutrition Goal',
+                                value: nutritionGoal,
+                                icon: Icons.monitor_heart_rounded,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _SectionCard(
+                          title: 'Account Info',
+                          child: Column(
+                            children: [
+                              _InfoRow(
+                                label: 'Member Since',
+                                value: memberSinceText,
+                                icon: Icons.calendar_today_rounded,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        _SectionCard(
+                          title: 'Account Settings',
+                          child: Column(
+                            children: [
+                              _ActionRow(
+                                icon: Icons.edit_rounded,
+                                label: 'Edit Profile',
+                                onTap: onEditProfileTap,
+                              ),
+                              const SizedBox(height: 6),
+                              _ActionRow(
+                                icon: Icons.lock_rounded,
+                                label: 'Change Password',
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          const ChangePasswordScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 6),
+                              _ActionRow(
+                                icon: Icons.logout_rounded,
+                                label: authController.isLoading
+                                    ? 'Signing out...'
+                                    : 'Logout',
+                                isDestructive: true,
+                                trailing: authController.isLoading
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : null,
+                                onTap:
+                                    authController.isLoading ? null : onLogout,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 14),
                       _SectionCard(
-                        title: 'Nutrition Goals',
-                        child: Column(
-                          children: [
-                            _InfoRow(
-                              label: 'Nutrition Goal',
-                              value: nutritionGoal,
-                              icon: Icons.monitor_heart_rounded,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      _SectionCard(
-                        title: 'Account Info',
-                        child: Column(
-                          children: [
-                            _InfoRow(
-                              label: 'Member Since',
-                              value: memberSinceText,
-                              icon: Icons.calendar_today_rounded,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      _SectionCard(
-                        title: 'Account Settings',
-                        child: Column(
-                          children: [
-                            _ActionRow(
-                              icon: Icons.edit_rounded,
-                              label: 'Edit Profile',
-                              onTap: onEditProfileTap,
-                            ),
-                            const SizedBox(height: 6),
-                            _ActionRow(
-                              icon: Icons.lock_rounded,
-                              label: 'Change Password',
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        const ChangePasswordScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 6),
-                            _ActionRow(
-                              icon: Icons.logout_rounded,
-                              label: authController.isLoading
-                                  ? 'Signing out...'
-                                  : 'Logout',
-                              isDestructive: true,
-                              trailing: authController.isLoading
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
+                        title: isPrivateView ? 'My Posts' : 'Posts',
+                        child: targetUid == null
+                            ? const SizedBox.shrink()
+                            : StreamBuilder(
+                                stream: repo.watchPostsForUser(targetUid!),
+                                builder: (context, snap) {
+                                  final posts = snap.data ?? const [];
+                                  if (snap.connectionState ==
+                                          ConnectionState.waiting &&
+                                      posts.isEmpty) {
+                                    return const Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 12),
+                                        child: CircularProgressIndicator(),
                                       ),
-                                    )
-                                  : null,
-                              onTap: authController.isLoading ? null : onLogout,
-                            ),
-                          ],
-                        ),
+                                    );
+                                  }
+                                  if (posts.isEmpty) {
+                                    return Text(
+                                      isPrivateView
+                                          ? 'You have no community posts yet.'
+                                          : 'No posts yet.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: AppColors.textSecondary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    );
+                                  }
+                                  return ListView.separated(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    itemCount: posts.length.clamp(0, 10),
+                                    separatorBuilder: (context, index) =>
+                                        const SizedBox(height: 12),
+                                    itemBuilder: (context, i) =>
+                                        CommunityPostCard(post: posts[i]),
+                                  );
+                                },
+                              ),
                       ),
                     ],
                   ),
@@ -658,6 +780,54 @@ class _CircleIconButton extends StatelessWidget {
   }
 }
 
+class _HeaderActionButton extends StatelessWidget {
+  const _HeaderActionButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(999),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 14,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: AppColors.textPrimary, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _BadgePill extends StatelessWidget {
   const _BadgePill({required this.label, required this.icon});
 
@@ -731,6 +901,94 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
+class _InlineStatItem {
+  const _InlineStatItem({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+}
+
+class _InlineStatsRow extends StatelessWidget {
+  const _InlineStatsRow({required this.items});
+
+  final List<_InlineStatItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            Expanded(child: _InlineStatsItemView(item: items[i])),
+            if (i != items.length - 1)
+              Container(
+                width: 1,
+                height: 52,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                color: AppColors.outline,
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineStatsItemView extends StatelessWidget {
+  const _InlineStatsItemView({required this.item});
+
+  final _InlineStatItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          height: 34,
+          width: 34,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.primary.withValues(alpha: 0.14),
+          ),
+          child: Icon(item.icon, color: AppColors.primaryDeep, size: 18),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          item.value,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
+              ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          item.label,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+// ignore: unused_element
 class _StatTile extends StatelessWidget {
   const _StatTile({
     required this.label,

@@ -341,6 +341,7 @@ class _MyRecipesScreenState extends State<MyRecipesScreen> with SingleTickerProv
 
 
 
+// ignore: unused_element
 class _NavBarItem extends StatelessWidget {
   const _NavBarItem({
     required this.icon,
@@ -413,6 +414,7 @@ class _RecipeCard extends StatelessWidget {
     }
   }
 
+  // ignore: unused_element
   Color _getDifficultyColor(String difficulty) {
     switch (difficulty.toLowerCase()) {
       case 'easy':

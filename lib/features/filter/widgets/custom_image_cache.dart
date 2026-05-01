@@ -1,6 +1,5 @@
 // lib/features/filter/presentation/widgets/custom_image_cache.dart
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -271,7 +270,7 @@ class _CustomCachedImageState extends State<CustomCachedImage> {
     return Icon(
       Icons.restaurant,
       size: widget.width * 0.5,
-      color: const Color(0xFFCB6B2E).withOpacity(0.7),
+      color: const Color(0xFFCB6B2E).withValues(alpha: 0.7),
     );
   }
 }

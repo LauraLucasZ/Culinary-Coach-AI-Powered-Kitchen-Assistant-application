@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+// ignore_for_file: deprecated_member_use, unnecessary_underscores
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,7 +11,7 @@ import 'package:culinary_coach_app/features/filter/data/services/ingredient_serv
 import 'package:culinary_coach_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:culinary_coach_app/features/settings/presentation/screens/settings_screen.dart';
 import 'package:culinary_coach_app/features/filter/widgets/custom_image_cache.dart';
-import 'scan.dart' hide IngredientModel;
+import 'scan.dart';
 import 'voice.dart';
 
 class FilterScreen extends StatefulWidget {
@@ -35,13 +36,11 @@ class _FilterScreenState extends State<FilterScreen> {
 
   static const Color _orangeDark = Color(0xFFB87313);
   static const Color _orange = Color(0xFFD99622);
-  static const Color _orangeLight = Color(0xFFF2B13E);
   static const Color _cream = Color(0xFFF7F1DE);
   static const Color _cardCream = Color(0xFFFCF7E8);
   static const Color _brown = Color(0xFF3A2214);
   static const Color _mutedBrown = Color(0xFF8B7355);
   static const Color _border = Color(0xFFE2C9A4);
-  static const Color _green = Color(0xFF5C8E3E);
 
   int get selectedCount => selectedIngredientsMap.values.where((item) => item.isChecked).length;
 
@@ -825,7 +824,7 @@ class _FilterScreenState extends State<FilterScreen> {
           body: Column(
             children: [
               FutureBuilder<String?>(
-                future: currentUser == null ? Future<String?>.value(null) : _getFirestoreFirstName(currentUser.uid),
+                future: _getFirestoreFirstName(currentUser.uid),
                 builder: (context, nameSnapshot) {
                   final resolvedName = (nameSnapshot.data != null && nameSnapshot.data!.isNotEmpty) ? nameSnapshot.data! : fallbackName;
                   return _PantryTopHeader(
@@ -1495,6 +1494,7 @@ class _IngredientCard extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _CategoryFilterSheet extends StatelessWidget {
   const _CategoryFilterSheet({
     required this.categories,
@@ -1546,6 +1546,7 @@ class _CategoryFilterSheet extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _ReferenceBottomBar extends StatelessWidget {
   const _ReferenceBottomBar({required this.onCenterTap, required this.selectedCount});
 

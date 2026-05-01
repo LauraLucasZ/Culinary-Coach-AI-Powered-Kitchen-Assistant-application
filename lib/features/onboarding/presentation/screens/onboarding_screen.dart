@@ -440,7 +440,7 @@ class _SignUpSlide extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Join a growing community of home chefs. Start scanning, cooking, and sharing today.',
+              'Join a growing community of home cooks. Start scanning, cooking, and sharing today.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: Colors.white.withValues(alpha: 0.62),
                 height: 1.5,
