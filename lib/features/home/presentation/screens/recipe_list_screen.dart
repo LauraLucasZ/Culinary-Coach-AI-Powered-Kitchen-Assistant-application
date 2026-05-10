@@ -1093,7 +1093,7 @@ class _RecipeFavoriteHeartButtonState extends State<_RecipeFavoriteHeartButton>
   Widget build(BuildContext context) {
     final borderColor = Color.lerp(
       Colors.black.withValues(alpha: 0.55),
-      const Color(0xFFE43D4E),
+      const Color(0xFFE43D4E).withValues(alpha: 0.60),
       _fillAnimation.value,
     );
 
@@ -1140,7 +1140,7 @@ class _RecipeFavoriteHeartButtonState extends State<_RecipeFavoriteHeartButton>
                     ],
                   ),
                 ),
-                Icon(Icons.favorite_border, color: borderColor, size: 17),
+                Icon(Icons.favorite_border, color: borderColor, size: 16.6),
               ],
             ),
           ),
