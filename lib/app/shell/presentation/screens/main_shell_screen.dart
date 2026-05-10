@@ -7,22 +7,35 @@ import 'package:culinary_coach_app/features/shop/presentation/screens/shop_scree
 import 'package:flutter/material.dart';
 
 class MainShellScreen extends StatefulWidget {
-  const MainShellScreen({super.key});
+  const MainShellScreen({
+    super.key,
+    this.initialIndex = 0,
+    this.openShopCartOnStart = false,
+  });
+
+  final int initialIndex;
+  final bool openShopCartOnStart;
 
   @override
   State<MainShellScreen> createState() => _MainShellPageState();
 }
 
 class _MainShellPageState extends State<MainShellScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex;
+  late final List<Widget> _pages;
 
-  final List<Widget> _pages = const [
-    HomeScreen(),
-    MyRecipesScreen(),
-    CommunityScreen(),
-    ShopScreen(),
-    FilterScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex.clamp(0, 4);
+    _pages = [
+      const HomeScreen(),
+      const MyRecipesScreen(),
+      const CommunityScreen(),
+      ShopScreen(showCartOnStart: widget.openShopCartOnStart),
+      const FilterScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {

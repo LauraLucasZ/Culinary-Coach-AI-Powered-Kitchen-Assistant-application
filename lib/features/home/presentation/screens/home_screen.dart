@@ -124,6 +124,9 @@ class _HomeScreenState extends State<HomeScreen> {
         readyInMinutes: recipe.readyInMinutes,
         servings: recipe.servings,
         calories: recipe.calories,
+        difficulty: recipe.difficulty,
+        preparationMinutes: recipe.preparationMinutes,
+        ingredientDetails: recipe.ingredientDetails,
         summary: recipe.summary,
         usedIngredients: pantryNames.isEmpty
             ? const []
@@ -157,6 +160,9 @@ class _HomeScreenState extends State<HomeScreen> {
       readyInMinutes: recipe.readyInMinutes,
       servings: recipe.servings,
       calories: recipe.calories,
+      difficulty: recipe.difficulty,
+      preparationMinutes: recipe.preparationMinutes,
+      ingredientDetails: recipe.ingredientDetails,
       summary: recipe.summary,
       usedIngredients: used,
       missedIngredients: missed,
@@ -1633,10 +1639,7 @@ class _RecipeCard extends StatelessWidget {
                         size: 46,
                       ),
                     )
-                  : Image.network(
-                      recipe.image,
-                      fit: BoxFit.cover,
-                    ),
+                  : Image.network(recipe.image, fit: BoxFit.cover),
             ),
             Positioned.fill(
               child: DecoratedBox(
