@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
@@ -1561,7 +1562,7 @@ class _RecipeSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 282,
+            height: 264,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: recipes.take(8).length,
@@ -1598,160 +1599,185 @@ class _RecipeCard extends StatelessWidget {
         MaterialPageRoute(builder: (_) => RecipeDetailsScreen(recipe: recipe)),
       ),
       child: Container(
-        width: 178,
+        width: 190,
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: const Color(0xFFFCF7E8),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: canMakeNow
-                ? const Color(0xFF6FA04D)
-                : const Color(0xFFE2C9A4),
-            width: canMakeNow ? 1.7 : 1,
+            color: Colors.white.withValues(alpha: 0.35),
+            width: canMakeNow ? 1.4 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 9,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.14),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(20),
-                  ),
-                  child: recipe.image.isEmpty
-                      ? Container(
-                          height: 116,
-                          width: double.infinity,
-                          color: const Color(0xFFF7F1DE),
-                          child: const Icon(
-                            Icons.restaurant,
-                            color: Color(0xFFB87313),
-                            size: 42,
-                          ),
-                        )
-                      : Image.network(
-                          recipe.image,
-                          height: 116,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
+            Positioned.fill(
+              child: recipe.image.isEmpty
+                  ? Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Color(0xFF5A4B3A), Color(0xFF2F2520)],
                         ),
-                ),
-                Positioned(
-                  top: 9,
-                  left: 9,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 14),
-                        const SizedBox(width: 3),
-                        Text(
-                          recipe.rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: 9,
-                  right: 9,
-                  child: GestureDetector(
-                    onTap: onToggleFavorite,
-                    child: _FavoriteHeartButton(isFavorite: isFavorite),
-                  ),
-                ),
-              ],
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      recipe.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF3A2214),
-                        fontSize: 13.5,
-                        height: 1.12,
-                        fontWeight: FontWeight.w900,
                       ),
+                      child: const Icon(
+                        Icons.restaurant,
+                        color: Color(0xFFFFD89B),
+                        size: 46,
+                      ),
+                    )
+                  : Image.network(
+                      recipe.image,
+                      fit: BoxFit.cover,
                     ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        _MiniInfo(
-                          icon: Icons.schedule_rounded,
-                          text: '${recipe.readyInMinutes} min',
-                          color: const Color(0xFF8B7355),
-                        ),
-                        const SizedBox(width: 8),
-                        _MiniInfo(
-                          icon: Icons.local_fire_department_rounded,
-                          text: recipe.calories > 0
-                              ? '${recipe.calories} cal'
-                              : '— cal',
-                          color: const Color(0xFF8B7355),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        _CountBadge(
-                          text: '${recipe.usedIngredientCount} used',
-                          color: const Color(0xFF6FA04D),
-                          icon: Icons.check_circle_rounded,
-                        ),
-                        _CountBadge(
-                          text: '${recipe.missedIngredientCount} missing',
-                          color: const Color(0xFFB87313),
-                          icon: Icons.add_circle_outline_rounded,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Expanded(
-                      child: Text(
-                        recipe.missedIngredients.isEmpty
-                            ? 'You have everything needed.'
-                            : 'Missing: ${recipe.missedIngredients.take(3).join(', ')}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: recipe.missedIngredients.isEmpty
-                              ? const Color(0xFF6FA04D)
-                              : const Color(0xFF8B7355),
-                          fontSize: 12,
-                          height: 1.25,
-                          fontWeight: FontWeight.w700,
-                        ),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.2),
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.48),
+                    ],
+                    stops: const [0.0, 0.36, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 9,
+              left: 9,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.36),
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.24),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.star, color: Color(0xFFFFC54D), size: 12),
+                    const SizedBox(width: 3),
+                    Text(
+                      recipe.rating.toStringAsFixed(1),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 9,
+              right: 9,
+              child: GestureDetector(
+                onTap: onToggleFavorite,
+                child: _FavoriteHeartButton(isFavorite: isFavorite),
+              ),
+            ),
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 8,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          recipe.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13.2,
+                            height: 1.12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            _CountBadge(
+                              text: '${recipe.usedIngredientCount} used',
+                              color: const Color(0xFF9BEA7A),
+                              icon: Icons.check_circle_rounded,
+                            ),
+                            _CountBadge(
+                              text: '${recipe.missedIngredientCount} missing',
+                              color: const Color(0xFFFFCF7A),
+                              icon: Icons.add_circle_outline_rounded,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          recipe.missedIngredients.isEmpty
+                              ? 'You have everything needed.'
+                              : 'Missing: ${recipe.missedIngredients.take(3).join(', ')}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.95),
+                            fontSize: 10.7,
+                            height: 1.2,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Container(
+                          height: 1,
+                          color: Colors.white.withValues(alpha: 0.24),
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            _MiniInfo(
+                              icon: Icons.schedule_rounded,
+                              text: '${recipe.readyInMinutes} mins',
+                              color: Colors.white.withValues(alpha: 0.92),
+                            ),
+                            const SizedBox(width: 8),
+                            _MiniInfo(
+                              icon: Icons.local_fire_department_rounded,
+                              text: recipe.calories > 0
+                                  ? '${recipe.calories} cal'
+                                  : '— cal',
+                              color: Colors.white.withValues(alpha: 0.92),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1847,7 +1873,9 @@ class _FavoriteHeartButtonState extends State<_FavoriteHeartButton>
                       if (value > 0)
                         Icon(
                           Icons.favorite,
-                          color: const Color(0xFFE43D4E).withValues(alpha: 0.12),
+                          color: const Color(
+                            0xFFE43D4E,
+                          ).withValues(alpha: 0.12),
                           size: 17,
                         ),
                       ClipPath(
@@ -1918,22 +1946,23 @@ class _CountBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
+        color: color.withValues(alpha: 0.22),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.45), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: color),
-          const SizedBox(width: 3),
+          Icon(icon, size: 10.5, color: color),
+          const SizedBox(width: 3.5),
           Text(
             text,
             style: TextStyle(
-              color: color,
-              fontSize: 9.5,
-              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -1956,7 +1985,7 @@ class _MiniInfo extends StatelessWidget {
     return Flexible(
       child: Row(
         children: [
-          Icon(icon, color: color, size: 14),
+          Icon(icon, color: color, size: 13.5),
           const SizedBox(width: 3),
           Flexible(
             child: Text(
@@ -1964,8 +1993,8 @@ class _MiniInfo extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: color,
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontSize: 10.4,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),

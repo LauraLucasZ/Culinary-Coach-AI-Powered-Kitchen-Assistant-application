@@ -961,6 +961,7 @@ class _ShopScreenState extends State<ShopScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         backgroundColor: _orangeDark,
         onPressed: _showCartPopup,
         child: Stack(

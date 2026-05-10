@@ -72,6 +72,7 @@ class _MainShellPageState extends State<MainShellScreen> {
           ],
         ),
         child: FloatingActionButton(
+          heroTag: null,
           elevation: 0,
           backgroundColor: _currentIndex == 4
               ? const Color(0xFFD9951F)
