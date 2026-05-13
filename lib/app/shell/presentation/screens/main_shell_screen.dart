@@ -22,26 +22,27 @@ class MainShellScreen extends StatefulWidget {
 
 class _MainShellPageState extends State<MainShellScreen> {
   late int _currentIndex;
-  late final List<Widget> _pages;
+  bool _isDarkMode = false;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex.clamp(0, 4);
-    _pages = [
-      const HomeScreen(),
-      const MyRecipesScreen(),
-      const CommunityScreen(),
-      ShopScreen(showCartOnStart: widget.openShopCartOnStart),
-      const FilterScreen(),
-    ];
+  }
+
+  void _setDarkMode(bool value) {
+    setState(() {
+      _isDarkMode = value;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      backgroundColor: AppColors.background,
+      backgroundColor:
+      _isDarkMode ? const Color(0xFF121212) : AppColors.background,
+
       body: Stack(
         children: [
           Positioned(
@@ -60,9 +61,29 @@ class _MainShellPageState extends State<MainShellScreen> {
               color: AppColors.accent.withValues(alpha: 0.28),
             ),
           ),
-          IndexedStack(index: _currentIndex, children: _pages),
+
+          IndexedStack(
+            index: _currentIndex,
+            children: [
+              const HomeScreen(),
+
+              MyRecipesScreen(
+                isDarkMode: _isDarkMode,
+                onDarkModeChanged: _setDarkMode,
+              ),
+
+              const CommunityScreen(),
+
+              ShopScreen(
+                showCartOnStart: widget.openShopCartOnStart,
+              ),
+
+              const FilterScreen(),
+            ],
+          ),
         ],
       ),
+
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
@@ -76,9 +97,8 @@ class _MainShellPageState extends State<MainShellScreen> {
               : null,
           boxShadow: [
             BoxShadow(
-              color: const Color(
-                0xFFE8A329,
-              ).withValues(alpha: _currentIndex == 4 ? 0.45 : 0.22),
+              color: const Color(0xFFE8A329)
+                  .withValues(alpha: _currentIndex == 4 ? 0.45 : 0.22),
               blurRadius: _currentIndex == 4 ? 16 : 10,
               offset: const Offset(0, 6),
             ),
@@ -93,9 +113,10 @@ class _MainShellPageState extends State<MainShellScreen> {
           foregroundColor: Colors.white,
           onPressed: () => setState(() => _currentIndex = 4),
           shape: const CircleBorder(),
-          child: const Icon(Icons.add, size: 30, weight: 300),
+          child: const Icon(Icons.add, size: 30),
         ),
       ),
+
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           boxShadow: [
@@ -107,10 +128,11 @@ class _MainShellPageState extends State<MainShellScreen> {
           ],
         ),
         child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          borderRadius:
+          const BorderRadius.vertical(top: Radius.circular(30)),
           child: BottomAppBar(
             height: 86,
-            color: Colors.white,
+            color: _isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
             elevation: 4,
             surfaceTintColor: Colors.transparent,
             shape: const CircularNotchedRectangle(),
@@ -124,6 +146,7 @@ class _MainShellPageState extends State<MainShellScreen> {
                       icon: Icons.home_rounded,
                       label: 'Home',
                       isSelected: _currentIndex == 0,
+                      isDarkMode: _isDarkMode,
                       onTap: () => setState(() => _currentIndex = 0),
                     ),
                   ),
@@ -132,6 +155,7 @@ class _MainShellPageState extends State<MainShellScreen> {
                       icon: Icons.favorite_border_rounded,
                       label: 'My Recipes',
                       isSelected: _currentIndex == 1,
+                      isDarkMode: _isDarkMode,
                       onTap: () => setState(() => _currentIndex = 1),
                     ),
                   ),
@@ -141,6 +165,7 @@ class _MainShellPageState extends State<MainShellScreen> {
                       icon: Icons.diversity_1,
                       label: 'Community',
                       isSelected: _currentIndex == 2,
+                      isDarkMode: _isDarkMode,
                       onTap: () => setState(() => _currentIndex = 2),
                     ),
                   ),
@@ -149,6 +174,7 @@ class _MainShellPageState extends State<MainShellScreen> {
                       icon: Icons.storefront_outlined,
                       label: 'Shop',
                       isSelected: _currentIndex == 3,
+                      isDarkMode: _isDarkMode,
                       onTap: () => setState(() => _currentIndex = 3),
                     ),
                   ),
@@ -168,17 +194,21 @@ class _NavBarItem extends StatelessWidget {
     required this.label,
     required this.isSelected,
     required this.onTap,
+    required this.isDarkMode,
   });
 
   final IconData icon;
   final String label;
   final bool isSelected;
+  final bool isDarkMode;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     const activeColor = Color(0xFFE8A329);
-    const inactiveColor = Color(0xFF8F8F8F);
+    final inactiveColor =
+    isDarkMode ? Colors.white70 : const Color(0xFF8F8F8F);
+
     final color = isSelected ? activeColor : inactiveColor;
 
     return InkWell(
@@ -196,7 +226,8 @@ class _NavBarItem extends StatelessWidget {
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
                 color: color,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontWeight:
+                isSelected ? FontWeight.w700 : FontWeight.w500,
                 fontSize: 11.5,
                 height: 1.0,
               ),
@@ -221,7 +252,9 @@ class _AmbientGlow extends StatelessWidget {
       width: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]),
+        gradient: RadialGradient(
+          colors: [color, color.withValues(alpha: 0)],
+        ),
       ),
     );
   }
