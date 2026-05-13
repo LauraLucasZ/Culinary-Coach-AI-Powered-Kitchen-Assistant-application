@@ -1,26 +1,24 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/features/community/data/models/community_comment.dart';
 import 'package:culinary_coach_app/features/community/data/models/community_notification.dart';
 import 'package:culinary_coach_app/features/community/data/models/community_post.dart';
 import 'package:culinary_coach_app/features/community/data/models/community_user.dart';
+import 'package:culinary_coach_app/features/community/data/services/community_post_image_encoding.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 class CommunityRepository {
   CommunityRepository({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
-    FirebaseStorage? storage,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance,
-        _storage = storage ?? FirebaseStorage.instance;
+        _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
-  final FirebaseStorage _storage;
 
   User get _requireUser {
     final u = _auth.currentUser;
@@ -185,43 +183,56 @@ class CommunityRepository {
     });
   }
 
-  Future<String?> uploadPostImage({
-    required Uint8List bytes,
-    required String postId,
-  }) async {
-    final viewer = _requireUser;
-    final ref = _storage.ref('posts/${viewer.uid}/$postId.jpg');
-    await ref.putData(bytes);
-    return await ref.getDownloadURL();
-  }
-
   Future<String> createPost({
     required String caption,
     String? recipeTitle,
     String? cookingTime,
     List<String>? tags,
-    Uint8List? imageBytes,
+    List<XFile> images = const [],
   }) async {
     final viewer = _requireUser;
     final viewerData = await getUser(viewer.uid);
     final postRef = postsCol().doc();
 
     final now = Timestamp.now();
-    String? imageUrl;
-    if (imageBytes != null) {
+    final uid = viewer.uid;
+
+    await viewer.getIdToken(true);
+
+    var imageBase64List = <String>[];
+    if (images.isNotEmpty) {
+      developer.log(
+        'createPost: encoding ${images.length} image(s) for Firestore (no Storage)',
+        name: 'CommunityRepository',
+      );
       try {
-        imageUrl = await uploadPostImage(bytes: imageBytes, postId: postRef.id);
-      } catch (_) {
-        imageUrl = null;
+        imageBase64List = await encodeCommunityPostImagesForFirestore(images);
+        developer.log(
+          'createPost: encode OK count=${imageBase64List.length}',
+          name: 'CommunityRepository',
+        );
+      } catch (e, st) {
+        developer.log(
+          'createPost: encode FAILED error=$e',
+          name: 'CommunityRepository',
+          error: e,
+          stackTrace: st,
+        );
+        rethrow;
       }
     }
 
-    await postRef.set({
-      'authorId': viewer.uid,
+    if (images.isNotEmpty && imageBase64List.isEmpty) {
+      throw StateError(
+        'Could not process the selected images. Try again or pick different photos.',
+      );
+    }
+
+    final payload = <String, dynamic>{
+      'authorId': uid,
       'authorName': viewerData?.displayName ?? (viewer.displayName ?? 'User'),
       'authorProfileImageUrl': viewerData?.profileImageUrl ?? viewer.photoURL,
       'caption': caption.trim(),
-      'imageUrl': imageUrl,
       'recipeTitle': recipeTitle?.trim().isEmpty ?? true ? null : recipeTitle!.trim(),
       'cookingTime': cookingTime?.trim().isEmpty ?? true ? null : cookingTime!.trim(),
       'tags': (tags ?? const <String>[])
@@ -232,7 +243,12 @@ class CommunityRepository {
       'likeCount': 0,
       'commentCount': 0,
       'repostCount': 0,
-    });
+    };
+    if (imageBase64List.isNotEmpty) {
+      payload['imageBase64List'] = imageBase64List;
+    }
+
+    await postRef.set(payload);
 
     await userDoc(viewer.uid).set(
       {'communityPosts': FieldValue.increment(1), 'updatedAt': now},
@@ -440,7 +456,9 @@ class CommunityRepository {
         'authorName': viewerData?.displayName ?? (viewer.displayName ?? 'User'),
         'authorProfileImageUrl': viewerData?.profileImageUrl ?? viewer.photoURL,
         'caption': (caption?.trim().isNotEmpty ?? false) ? caption!.trim() : original.caption,
-        'imageUrl': original.imageUrl,
+        if (original.imageUrls.isNotEmpty) 'imageUrls': original.imageUrls,
+        if (original.imageBase64List.isNotEmpty)
+          'imageBase64List': original.imageBase64List,
         'recipeTitle': original.recipeTitle,
         'cookingTime': original.cookingTime,
         'tags': original.tags,

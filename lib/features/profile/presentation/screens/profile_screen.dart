@@ -4,6 +4,7 @@ import 'package:culinary_coach_app/features/auth/presentation/controllers/auth_c
 import 'package:culinary_coach_app/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:culinary_coach_app/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:culinary_coach_app/core/widgets/current_user_avatar.dart';
+import 'package:culinary_coach_app/features/community/data/models/community_post.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
 import 'package:culinary_coach_app/features/community/presentation/widgets/community_post_card.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -196,6 +197,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
           },
         );
       },
+    );
+  }
+}
+
+class _ProfilePostsSection extends StatelessWidget {
+  const _ProfilePostsSection({
+    required this.repo,
+    required this.targetUid,
+    required this.isPrivateView,
+  });
+
+  final CommunityRepository repo;
+  final String targetUid;
+  final bool isPrivateView;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      title: isPrivateView ? 'My Posts' : 'Posts',
+      child: StreamBuilder<List<CommunityPost>>(
+        stream: repo.watchPostsForUser(targetUid),
+        builder: (context, snap) {
+          final posts = snap.data ?? const [];
+          if (snap.connectionState == ConnectionState.waiting && posts.isEmpty) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: CircularProgressIndicator(color: AppColors.primaryDeep),
+              ),
+            );
+          }
+          if (posts.isEmpty) {
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceMuted,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.outline),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.post_add_rounded,
+                    size: 36,
+                    color: AppColors.primaryDeep.withValues(alpha: 0.85),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isPrivateView
+                        ? 'No posts yet — share a photo or thought with the community from the Community tab.'
+                        : 'No posts yet.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
+                        ),
+                  ),
+                ],
+              ),
+            );
+          }
+          return ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: posts.length.clamp(0, 10),
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, i) => CommunityPostCard(post: posts[i]),
+          );
+        },
+      ),
     );
   }
 }
@@ -515,6 +588,14 @@ class _ProfileScaffold extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 14),
+                      if (!isPrivateView && targetUid != null) ...[
+                        _ProfilePostsSection(
+                          repo: repo,
+                          targetUid: targetUid!,
+                          isPrivateView: isPrivateView,
+                        ),
+                        const SizedBox(height: 14),
+                      ],
                       if (isPrivateView) ...[
                         _SectionCard(
                           title: 'Practical Cooking Settings',
@@ -576,6 +657,13 @@ class _ProfileScaffold extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 14),
+                        if (targetUid != null)
+                          _ProfilePostsSection(
+                            repo: repo,
+                            targetUid: targetUid!,
+                            isPrivateView: isPrivateView,
+                          ),
+                        if (targetUid != null) const SizedBox(height: 14),
                         _SectionCard(
                           title: 'Account Settings',
                           child: Column(
@@ -621,51 +709,6 @@ class _ProfileScaffold extends StatelessWidget {
                           ),
                         ),
                       ],
-                      const SizedBox(height: 14),
-                      _SectionCard(
-                        title: isPrivateView ? 'My Posts' : 'Posts',
-                        child: targetUid == null
-                            ? const SizedBox.shrink()
-                            : StreamBuilder(
-                                stream: repo.watchPostsForUser(targetUid!),
-                                builder: (context, snap) {
-                                  final posts = snap.data ?? const [];
-                                  if (snap.connectionState ==
-                                          ConnectionState.waiting &&
-                                      posts.isEmpty) {
-                                    return const Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 12),
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    );
-                                  }
-                                  if (posts.isEmpty) {
-                                    return Text(
-                                      isPrivateView
-                                          ? 'You have no community posts yet.'
-                                          : 'No posts yet.',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                            color: AppColors.textSecondary,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                    );
-                                  }
-                                  return ListView.separated(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: posts.length.clamp(0, 10),
-                                    separatorBuilder: (context, index) =>
-                                        const SizedBox(height: 12),
-                                    itemBuilder: (context, i) =>
-                                        CommunityPostCard(post: posts[i]),
-                                  );
-                                },
-                              ),
-                      ),
                     ],
                   ),
                 ),
