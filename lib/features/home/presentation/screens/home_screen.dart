@@ -787,8 +787,6 @@ class _HomeScreenState extends State<HomeScreen> {
         final data = userSnapshot.data?.data();
         final firstName = (data?['firstName'] as String?)?.trim();
         final resolvedName = firstName != null && firstName.isNotEmpty ? firstName : fallbackName;
-        final profileImageUrl = (data?['profileImageUrl'] as String?)?.trim();
-        final profileImageLocalPath = (data?['profileImageLocalPath'] as String?)?.trim();
 
         return StreamBuilder<List<SavedIngredientSelection>>(
           stream: _ingredientService.streamUserSelectedIngredients(currentUser.uid),
@@ -814,8 +812,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _HomeTopHero(
                     displayName: resolvedName,
-                    profileImageUrl: profileImageUrl,
-                    profileImageLocalPath: profileImageLocalPath,
                     searchController: _searchController,
                     pantryCount: selectedIngredients.length,
                     activeFilterCount: _activeFilterCount,
@@ -1325,8 +1321,6 @@ class _ErrorCard extends StatelessWidget {
 class _HomeTopHero extends StatelessWidget {
   const _HomeTopHero({
     required this.displayName,
-    required this.profileImageUrl,
-    required this.profileImageLocalPath,
     required this.searchController,
     required this.pantryCount,
     required this.activeFilterCount,
@@ -1339,8 +1333,6 @@ class _HomeTopHero extends StatelessWidget {
   });
 
   final String displayName;
-  final String? profileImageUrl;
-  final String? profileImageLocalPath;
   final TextEditingController searchController;
   final int pantryCount;
   final int activeFilterCount;
@@ -1366,7 +1358,7 @@ class _HomeTopHero extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  CurrentUserAvatar(size: 40, onTap: onProfileTap, overrideImageUrl: profileImageUrl, overrideLocalPath: profileImageLocalPath, backgroundColor: const Color(0xFFD28E18), borderColor: Colors.white.withValues(alpha: 0.65), borderWidth: 2),
+                  CurrentUserAvatar(size: 40, onTap: onProfileTap, backgroundColor: const Color(0xFFD28E18), borderColor: Colors.white.withValues(alpha: 0.65), borderWidth: 2),
                   const SizedBox(width: 10),
                   Expanded(child: Text(displayName, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w700))),
                   if (pantryCount > 0) ...[

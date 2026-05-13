@@ -54,6 +54,7 @@ dependencies:
   image: ^4.8.0
   cached_network_image: ^3.4.1
   firebase_app_check: 0.4.3
+  emoji_picker_flutter: ^4.4.0
 
 
 dev_dependencies:

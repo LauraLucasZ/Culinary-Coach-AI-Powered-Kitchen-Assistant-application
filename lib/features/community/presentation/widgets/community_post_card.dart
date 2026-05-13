@@ -3,7 +3,10 @@ import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
+import 'package:culinary_coach_app/core/widgets/app_default_user_avatar.dart';
+import 'package:culinary_coach_app/features/community/data/models/community_comment.dart';
 import 'package:culinary_coach_app/features/community/data/models/community_post.dart';
+import 'package:culinary_coach_app/features/community/data/models/community_reply.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
 import 'package:culinary_coach_app/features/community/presentation/widgets/comments_sheet.dart';
 import 'package:culinary_coach_app/features/profile/presentation/screens/profile_screen.dart';
@@ -38,6 +41,7 @@ class CommunityPostCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _HeaderRow(
+            authorId: post.authorId,
             authorName: post.authorName,
             authorProfileImageUrl: post.authorProfileImageUrl,
             createdAt: post.createdAt,
@@ -144,6 +148,7 @@ class CommunityPostCard extends StatelessWidget {
               ),
             ],
           ),
+          _PostCommentPreview(post: post),
         ],
       ),
     );
@@ -152,14 +157,186 @@ class CommunityPostCard extends StatelessWidget {
   static String _formatCount(int v) => v.toString();
 }
 
+class _PostCommentPreview extends StatelessWidget {
+  const _PostCommentPreview({required this.post});
+
+  final CommunityPost post;
+
+  @override
+  Widget build(BuildContext context) {
+    if (post.commentCount <= 0) return const SizedBox.shrink();
+
+    final repo = CommunityRepository();
+    return StreamBuilder<List<CommunityComment>>(
+      stream: repo.watchCommentPreviewForPost(post.id),
+      builder: (context, snap) {
+        final comments = snap.data ?? const <CommunityComment>[];
+        if (comments.isEmpty &&
+            snap.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                height: 14,
+                width: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+        if (comments.isEmpty) return const SizedBox.shrink();
+
+        final moreComments = post.commentCount > comments.length;
+        final moreReplies = comments.any((c) => c.replies.length > 2);
+        final showViewMore = moreComments || moreReplies;
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceMuted,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.outline.withValues(alpha: 0.55),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final c in comments) ...[
+                  _PreviewCommentLine(comment: c),
+                  for (final r in c.replies.take(2))
+                    _PreviewReplyLine(reply: r),
+                ],
+                if (showViewMore)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 0),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () =>
+                          CommentsSheet.show(context, postId: post.id),
+                      child: const Text('View more comments'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PreviewCommentLine extends StatelessWidget {
+  const _PreviewCommentLine({required this.comment});
+
+  final CommunityComment comment;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+          height: 1.25,
+        );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppDefaultUserAvatarByUid(
+            userId: comment.uid,
+            fallbackImageUrl: comment.profileImageUrl,
+            size: 22,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '${comment.name} ',
+                    style: baseStyle?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  TextSpan(text: comment.text, style: baseStyle),
+                ],
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewReplyLine extends StatelessWidget {
+  const _PreviewReplyLine({required this.reply});
+
+  final CommunityReply reply;
+
+  @override
+  Widget build(BuildContext context) {
+    final baseStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: AppColors.textSecondary,
+          fontWeight: FontWeight.w600,
+          height: 1.25,
+        );
+    return Padding(
+      padding: const EdgeInsets.only(left: 6, bottom: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppDefaultUserAvatarByUid(
+            userId: reply.userId,
+            fallbackImageUrl: reply.userAvatar,
+            size: 18,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '${reply.userName} ',
+                    style: baseStyle?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  TextSpan(text: reply.text, style: baseStyle),
+                ],
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HeaderRow extends StatelessWidget {
   const _HeaderRow({
+    required this.authorId,
     required this.authorName,
     required this.authorProfileImageUrl,
     required this.createdAt,
     required this.onAuthorTap,
   });
 
+  final String authorId;
   final String authorName;
   final String? authorProfileImageUrl;
   final DateTime createdAt;
@@ -172,23 +349,10 @@ class _HeaderRow extends StatelessWidget {
         InkWell(
           onTap: onAuthorTap,
           borderRadius: BorderRadius.circular(999),
-          child: Container(
-            height: 40,
-            width: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.outline),
-              color: AppColors.surfaceMuted,
-              image: (authorProfileImageUrl ?? '').trim().isEmpty
-                  ? null
-                  : DecorationImage(
-                      image: CachedNetworkImageProvider(authorProfileImageUrl!),
-                      fit: BoxFit.cover,
-                    ),
-            ),
-            child: (authorProfileImageUrl ?? '').trim().isEmpty
-                ? const Icon(Icons.person_rounded, color: AppColors.textMuted)
-                : null,
+          child: AppDefaultUserAvatarByUid(
+            userId: authorId,
+            fallbackImageUrl: authorProfileImageUrl,
+            size: 40,
           ),
         ),
         const SizedBox(width: 10),

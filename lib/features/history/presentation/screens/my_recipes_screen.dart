@@ -82,11 +82,25 @@ class _MyRecipesScreenState extends State<MyRecipesScreen> with SingleTickerProv
     ),
   ];
 
+  Future<void> _persistFavoriteRecipeCount() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set(
+        {'favoriteRecipesCount': _favoriteRecipes.length},
+        SetOptions(merge: true),
+      );
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadUserName();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _persistFavoriteRecipeCount();
+    });
   }
 
   Future<void> _loadUserName() async {
@@ -319,6 +333,7 @@ class _MyRecipesScreenState extends State<MyRecipesScreen> with SingleTickerProv
                 }
               }
             });
+            _persistFavoriteRecipeCount();
           },
           onTap: () {
             // Navigate to recipe details

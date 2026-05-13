@@ -4,6 +4,7 @@ import 'package:culinary_coach_app/features/auth/presentation/controllers/auth_c
 import 'package:culinary_coach_app/features/onboarding/presentation/screens/onboarding_screen.dart';
 import 'package:culinary_coach_app/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:culinary_coach_app/core/widgets/current_user_avatar.dart';
+import 'package:culinary_coach_app/core/widgets/app_default_user_avatar.dart';
 import 'package:culinary_coach_app/features/community/data/models/community_post.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
 import 'package:culinary_coach_app/features/community/presentation/widgets/community_post_card.dart';
@@ -12,6 +13,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:culinary_coach_app/features/profile/presentation/screens/change_password_screen.dart';
+import 'package:culinary_coach_app/features/profile/presentation/screens/follow_connections_screen.dart';
+import 'package:culinary_coach_app/features/profile/presentation/screens/user_posts_screen.dart';
 import 'dart:typed_data';
 
 class ProfileScreen extends StatefulWidget {
@@ -206,11 +209,13 @@ class _ProfilePostsSection extends StatelessWidget {
     required this.repo,
     required this.targetUid,
     required this.isPrivateView,
+    required this.posterShortName,
   });
 
   final CommunityRepository repo;
   final String targetUid;
   final bool isPrivateView;
+  final String posterShortName;
 
   @override
   Widget build(BuildContext context) {
@@ -260,12 +265,45 @@ class _ProfilePostsSection extends StatelessWidget {
               ),
             );
           }
-          return ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: posts.length.clamp(0, 10),
-            separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, i) => CommunityPostCard(post: posts[i]),
+          const previewCount = 2;
+          final preview = posts.take(previewCount).toList();
+          final hasMore = posts.length > previewCount;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: preview.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                itemBuilder: (context, i) => CommunityPostCard(post: preview[i]),
+              ),
+              if (hasMore) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.center,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => UserPostsScreen(
+                            targetUid: targetUid,
+                            posterDisplayName: posterShortName,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      'View more posts',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primaryDeep,
+                          ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           );
         },
       ),
@@ -309,9 +347,14 @@ class _ProfileScaffold extends StatelessWidget {
     final resolvedEmail = isPrivateView ? (user?.email ?? '').trim() : '';
 
     final resolvedName = _resolveFullName(user: user, userData: userData);
+    final posterShortName = () {
+      final t = resolvedName.trim();
+      if (t.isEmpty) return 'Chef';
+      return t.split(RegExp(r'\s+')).first;
+    }();
+    final otherProfileUid =
+        isPrivateView ? '' : ((targetUid ?? '').trim());
     final firestoreImageUrl = (userData?['profileImageUrl'] as String?)?.trim();
-    final firestoreLocalPath =
-        (userData?['profileImageLocalPath'] as String?)?.trim();
 
     final cookingLevel =
         _readString(userData, keys: ['cookingLevel', 'level', 'skillLevel']) ??
@@ -340,7 +383,11 @@ class _ProfileScaffold extends StatelessWidget {
 
     final memberSinceText = _formatMemberSince(user?.metadata.creationTime);
 
-    final statsSaved = _readInt(userData, keys: ['savedRecipes', 'savedCount']);
+    final statsFavorites = _readInt(userData, keys: [
+      'favoriteRecipesCount',
+      'savedRecipes',
+      'savedCount',
+    ]);
     final statsMyRecipes = _readInt(userData, keys: ['myRecipes', 'recipesCount']);
     final statsPosts =
         _readInt(userData, keys: ['communityPosts', 'postsCount']);
@@ -428,29 +475,30 @@ class _ProfileScaffold extends StatelessWidget {
                                   onTap: onAvatarTap,
                                   isLoadingOverlay: isAvatarUploading,
                                   overrideImageBytes: localAvatarBytes,
-                                  overrideImageUrl: (firestoreImageUrl != null &&
-                                          firestoreImageUrl.isNotEmpty)
-                                      ? firestoreImageUrl
-                                      : null,
-                                  overrideLocalPath: (localAvatarPath != null &&
-                                          localAvatarPath!.trim().isNotEmpty)
-                                      ? localAvatarPath!.trim()
-                                      : ((firestoreLocalPath != null &&
-                                              firestoreLocalPath.isNotEmpty)
-                                          ? firestoreLocalPath
-                                          : null),
                                   backgroundColor: const Color(0xFFD28E18),
                                   borderColor:
                                       Colors.white.withValues(alpha: 0.7),
                                   borderWidth: 2,
                                 )
-                              : _PublicProfileAvatar(
-                                  size: 62,
-                                  imageUrl: (firestoreImageUrl != null &&
-                                          firestoreImageUrl.isNotEmpty)
-                                      ? firestoreImageUrl
-                                      : null,
-                                ),
+                              : otherProfileUid.isEmpty
+                                  ? CircleAvatar(
+                                      radius: 31,
+                                      backgroundColor: const Color(0xFFD28E18),
+                                      child: Icon(
+                                        Icons.person_rounded,
+                                        color: Colors.white.withValues(alpha: 0.95),
+                                        size: 34,
+                                      ),
+                                    )
+                                  : AppDefaultUserAvatarByUid(
+                                      userId: otherProfileUid,
+                                      fallbackImageUrl: firestoreImageUrl,
+                                      size: 62,
+                                      borderColor:
+                                          Colors.white.withValues(alpha: 0.7),
+                                      borderWidth: 2,
+                                      heroTag: 'profile-avatar-$otherProfileUid',
+                                    ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -511,11 +559,35 @@ class _ProfileScaffold extends StatelessWidget {
                               icon: Icons.group_add_rounded,
                               value: _formatCount(followersCount),
                               label: 'Followers',
+                              onTap: targetUid == null
+                                  ? null
+                                  : () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) => FollowConnectionsScreen(
+                                            targetUid: targetUid!,
+                                            followers: true,
+                                          ),
+                                        ),
+                                      );
+                                    },
                             ),
                             _InlineStatItem(
                               icon: Icons.how_to_reg_rounded,
                               value: _formatCount(followingCount),
                               label: 'Following',
+                              onTap: targetUid == null
+                                  ? null
+                                  : () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute<void>(
+                                          builder: (_) => FollowConnectionsScreen(
+                                            targetUid: targetUid!,
+                                            followers: false,
+                                          ),
+                                        ),
+                                      );
+                                    },
                             ),
                             _InlineStatItem(
                               icon: Icons.favorite_rounded,
@@ -531,9 +603,9 @@ class _ProfileScaffold extends StatelessWidget {
                         child: _InlineStatsRow(
                           items: [
                             _InlineStatItem(
-                              icon: Icons.bookmark_rounded,
-                              value: _formatCount(statsSaved),
-                              label: 'Saved',
+                              icon: Icons.star_rounded,
+                              value: _formatCount(statsFavorites),
+                              label: 'Favorites',
                             ),
                             _InlineStatItem(
                               icon: Icons.restaurant_menu_rounded,
@@ -593,6 +665,7 @@ class _ProfileScaffold extends StatelessWidget {
                           repo: repo,
                           targetUid: targetUid!,
                           isPrivateView: isPrivateView,
+                          posterShortName: posterShortName,
                         ),
                         const SizedBox(height: 14),
                       ],
@@ -662,6 +735,7 @@ class _ProfileScaffold extends StatelessWidget {
                             repo: repo,
                             targetUid: targetUid!,
                             isPrivateView: isPrivateView,
+                            posterShortName: posterShortName,
                           ),
                         if (targetUid != null) const SizedBox(height: 14),
                         _SectionCard(
@@ -799,40 +873,6 @@ class _ProfileScaffold extends StatelessWidget {
     return '$y-$m-$d';
   }
 
-}
-
-class _PublicProfileAvatar extends StatelessWidget {
-  const _PublicProfileAvatar({required this.size, required this.imageUrl});
-
-  final double size;
-  final String? imageUrl;
-
-  @override
-  Widget build(BuildContext context) {
-    final url = (imageUrl ?? '').trim();
-    return Container(
-      height: size,
-      width: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: const Color(0xFFD28E18),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.7),
-          width: 2,
-        ),
-        image: url.isEmpty
-            ? null
-            : DecorationImage(image: NetworkImage(url), fit: BoxFit.cover),
-      ),
-      child: url.isEmpty
-          ? Icon(
-              Icons.person_rounded,
-              color: Colors.white,
-              size: size * 0.55,
-            )
-          : null,
-    );
-  }
 }
 
 class _CircleIconButton extends StatelessWidget {
@@ -992,11 +1032,13 @@ class _InlineStatItem {
     required this.icon,
     required this.value,
     required this.label,
+    this.onTap,
   });
 
   final IconData icon;
   final String value;
   final String label;
+  final VoidCallback? onTap;
 }
 
 class _InlineStatsRow extends StatelessWidget {
@@ -1038,7 +1080,7 @@ class _InlineStatsItemView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final column = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
@@ -1070,6 +1112,20 @@ class _InlineStatsItemView extends StatelessWidget {
               ),
         ),
       ],
+    );
+
+    if (item.onTap == null) return column;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: column,
+        ),
+      ),
     );
   }
 }

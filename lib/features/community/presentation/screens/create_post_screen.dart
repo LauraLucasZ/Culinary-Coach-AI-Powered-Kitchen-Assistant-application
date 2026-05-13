@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/core/widgets/current_user_avatar.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
+import 'package:culinary_coach_app/features/community/presentation/widgets/community_emoji_picker_sheet.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
@@ -27,6 +28,7 @@ class CreatePostScreen extends StatefulWidget {
 
 class _CreatePostScreenState extends State<CreatePostScreen> {
   final _captionController = TextEditingController();
+  final _captionScrollController = ScrollController();
   final _picker = ImagePicker();
   final _repo = CommunityRepository();
 
@@ -48,6 +50,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   @override
   void dispose() {
     _captionController.dispose();
+    _captionScrollController.dispose();
     super.dispose();
   }
 
@@ -236,8 +239,6 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
         builder: (context, snap) {
           final data = snap.data?.data();
-          final url = (data?['profileImageUrl'] as String?)?.trim();
-          final localPath = (data?['profileImageLocalPath'] as String?)?.trim();
           final firstName = (data?['firstName'] as String?)?.trim();
           final resolvedName = (firstName != null && firstName.isNotEmpty)
               ? firstName
@@ -275,10 +276,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                     children: [
                       CurrentUserAvatar(
                         size: 48,
-                        overrideImageUrl: url,
-                        overrideLocalPath: localPath,
                         backgroundColor: const Color(0xFFD28E18),
-                        borderColor: AppColors.outline,
+                        borderColor: Colors.white.withValues(alpha: 0.65),
                         borderWidth: 2,
                       ),
                       const SizedBox(width: 12),
@@ -298,7 +297,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                 ),
                 const SizedBox(height: 18),
                 Container(
-                  constraints: const BoxConstraints(minHeight: 140),
+                  constraints: const BoxConstraints(minHeight: 228),
+                  padding: const EdgeInsets.fromLTRB(8, 10, 8, 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(22),
@@ -313,16 +313,16 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ),
                   child: TextField(
                     controller: _captionController,
-                    minLines: 6,
-                    maxLines: 12,
+                    scrollController: _captionScrollController,
+                    minLines: 7,
+                    maxLines: 14,
                     keyboardType: TextInputType.multiline,
                     textCapitalization: TextCapitalization.sentences,
                     enabled: !_submitting,
-                    // Full Unicode including emoji (no inputFormatters that strip symbols).
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: AppColors.textPrimary,
                           fontWeight: FontWeight.w600,
-                          height: 1.4,
+                          height: 1.45,
                         ),
                     decoration: InputDecoration(
                       hintText: 'Share something with the community...',
@@ -331,12 +331,14 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                             fontWeight: FontWeight.w600,
                           ),
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.fromLTRB(14, 18, 14, 20),
                     ),
                   ),
                 ),
                 const SizedBox(height: 14),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Expanded(
                       child: _AttachmentChip(
@@ -351,6 +353,19 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                         icon: Icons.photo_camera_rounded,
                         label: 'Camera',
                         onTap: _submitting ? null : _pickFromCamera,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 1),
+                      child: CommunityEmojiIconButton(
+                        onPressed: _submitting
+                            ? null
+                            : () => showCommunityEmojiPickerSheet(
+                                  context,
+                                  textController: _captionController,
+                                  scrollController: _captionScrollController,
+                                ),
                       ),
                     ),
                   ],
