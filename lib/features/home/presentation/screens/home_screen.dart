@@ -1168,23 +1168,59 @@ class _HomeScreenState extends State<HomeScreen> {
                                 final matchedWithCounts = _recipesWithPantryCounts(_matchedRecipes, selectedIngredients);
                                 final randomWithCounts = _recipesWithPantryCounts(_randomRecipes, selectedIngredients);
 
-                                return _HomeRecipeSections(
-                                  matchedRecipes: matchedWithCounts,
-                                  randomRecipes: randomWithCounts,
-                                  isLoadingMatches: _isLoadingMatches,
-                                  isLoadingRandom: _isLoadingRandom,
-                                  onSeeMoreMatches: () => _openSeeMore('Recipe Matches', matchedWithCounts),
-                                  onSeeMoreRandom: () => _openSeeMore('Recommended Recipe', randomWithCounts),
+                                return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                                  stream: FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(currentUser.uid)
+                                      .collection('favorite_recipes')
+                                      .snapshots(),
+                                  builder: (context, favoriteSnapshot) {
+                                    final favoriteRecipeIds = <int>{};
+
+                                    for (final doc in favoriteSnapshot.data?.docs ?? const []) {
+                                      final data = doc.data();
+                                      final recipeId = data['recipeId'];
+                                      if (recipeId is int) {
+                                        favoriteRecipeIds.add(recipeId);
+                                      } else {
+                                        final parsedId = int.tryParse(doc.id);
+                                        if (parsedId != null) favoriteRecipeIds.add(parsedId);
+                                      }
+                                    }
+
+                                    _favoriteOverrides.forEach((recipeId, isFavorite) {
+                                      if (isFavorite) {
+                                        favoriteRecipeIds.add(recipeId);
+                                      } else {
+                                        favoriteRecipeIds.remove(recipeId);
+                                      }
+                                    });
+
+                                    return _HomeRecipeSections(
+                                      matchedRecipes: matchedWithCounts,
+                                      randomRecipes: randomWithCounts,
+                                      favoriteRecipeIds: favoriteRecipeIds,
+                                      isLoadingMatches: _isLoadingMatches,
+                                      isLoadingRandom: _isLoadingRandom,
+                                      onSeeMoreMatches: () => _openSeeMore('Recipe Matches', matchedWithCounts),
+                                      onSeeMoreRandom: () => _openSeeMore('Recommended Recipe', randomWithCounts),
+                                      onToggleFavorite: (recipe) => _toggleFavoriteRecipe(
+                                        userId: currentUser.uid,
+                                        recipe: recipe,
+                                        isFavorite: favoriteRecipeIds.contains(recipe.id),
+                                      ),
+                                    );
+                                  },
                                 );
                               },
                             ),
-                          ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                );
-              },
+                ],
+              ),
             );
           },
         );

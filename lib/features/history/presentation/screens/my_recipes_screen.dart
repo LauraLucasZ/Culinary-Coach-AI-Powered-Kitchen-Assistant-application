@@ -95,49 +95,13 @@ class _MyRecipesScreenState extends State<MyRecipesScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  Future<void> _persistFavoriteRecipeCount() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    try {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set(
-        {'favoriteRecipesCount': _favoriteRecipes.length},
-        SetOptions(merge: true),
-      );
-    } catch (_) {}
-  }
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadUserName();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _persistFavoriteRecipeCount();
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
     });
-  }
-
-  Future<void> _loadUserName() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      try {
-        final doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-        final data = doc.data();
-        final firstName = (data?['firstName'] as String?)?.trim();
-        if (firstName != null && firstName.isNotEmpty) {
-          setState(() => _userName = firstName);
-          return;
-        }
-      } catch (_) {}
-
-      // Fallback to display name or email
-      final fallback = user.displayName?.split(' ').first ??
-          user.email?.split('@').first ??
-          'Chef';
-      setState(() => _userName = fallback);
-    }
   }
 
   @override
@@ -305,7 +269,11 @@ class _HistoryTab extends StatelessWidget {
               children: [
                 const Icon(Icons.error_outline, size: 48, color: Color(0xFFCB6B2E)),
                 const SizedBox(height: 12),
-                Text('Error: ${snapshot.error}', style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87)),
+                Text(
+                  'Error: ${snapshot.error}',
+                  style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black87),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           );
@@ -348,48 +316,24 @@ class _HistoryTab extends StatelessWidget {
           );
         }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: recipes.length,
-      itemBuilder: (context, index) {
-        final recipe = recipes[index];
-        return _RecipeCard(
-          recipe: recipe,
-          isHistory: isHistory,
-          onToggleFavorite: () {
-            setState(() {
-              if (isHistory) {
-                // For history items, toggle favorite status
-                recipe.isFavorite = !recipe.isFavorite;
-                if (recipe.isFavorite) {
-                  // Add to favorites
-                  _favoriteRecipes.insert(0, RecipeModel(
-                    id: recipe.id,
-                    name: recipe.name,
-                    imageUrl: recipe.imageUrl,
-                    cookingTime: recipe.cookingTime,
-                    isFavorite: true,
-                    date: DateTime.now(),
-                  ));
-                } else {
-                  // Remove from favorites
-                  _favoriteRecipes.removeWhere((r) => r.id == recipe.id);
-                }
-              } else {
-                // For favorites, remove from favorites
-                _favoriteRecipes.removeWhere((r) => r.id == recipe.id);
-                // Update history item if exists
-                final historyIndex = _historyRecipes.indexWhere((r) => r.id == recipe.id);
-                if (historyIndex != -1) {
-                  _historyRecipes[historyIndex].isFavorite = false;
-                }
-              }
-            });
-            _persistFavoriteRecipeCount();
-          },
-          onTap: () {
-            // Navigate to recipe details
-            _showRecipeDetails(context, recipe);
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          physics: const AlwaysScrollableScrollPhysics(),
+          itemCount: recipes.length,
+          itemBuilder: (context, index) {
+            final doc = recipes[index];
+            final data = doc.data() as Map<String, dynamic>;
+            final recipe = _recipeMatchFromFirestore(data, doc.id);
+            final startedAt = data['startedAt'] as Timestamp?;
+
+            return _RecipeCard(
+              recipe: recipe,
+              recipeId: doc.id,
+              userId: userId,
+              isHistory: true,
+              timestamp: startedAt,
+              isDarkMode: isDarkMode,
+            );
           },
         );
       },
