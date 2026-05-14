@@ -39,6 +39,7 @@ dependencies:
   firebase_auth: ^6.3.0
   google_sign_in: ^7.2.0
   cloud_firestore: ^6.2.0
+  flutter_riverpod: ^2.5.1
   record: ^6.0.0
   path_provider: ^2.1.5
   http: ^1.1.0

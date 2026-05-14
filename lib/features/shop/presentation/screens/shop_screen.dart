@@ -14,7 +14,9 @@ import '../../../filter/presentation/screens/filter_screen.dart';
 import '../../../filter/presentation/screens/voice.dart';
 
 class ShopScreen extends StatefulWidget {
-  const ShopScreen({super.key});
+  const ShopScreen({super.key, this.showCartOnStart = false});
+
+  final bool showCartOnStart;
 
   @override
   State<ShopScreen> createState() => _ShopScreenState();
@@ -79,7 +81,35 @@ class _ShopScreenState extends State<ShopScreen> {
   void initState() {
     super.initState();
     _initializeIngredients();
+    _hydrateSavedCart();
     _loadBestSellers();
+  }
+
+  Future<void> _hydrateSavedCart() async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+    try {
+      final selections = await _ingredientService.getUserShopCartItems(userId);
+      if (!mounted) return;
+      setState(() {
+        selectedIngredientsMap = {
+          for (final item in selections)
+            item.ingredient.id: SelectedIngredientData(
+              ingredient: item.ingredient,
+              quantity: item.quantity.clamp(0.1, 100.0).toDouble(),
+              isChecked: true,
+            ),
+        };
+      });
+      if (widget.showCartOnStart && selectedCount > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _showCartPopup();
+        });
+      }
+    } catch (_) {
+      // Keep screen usable even if saved cart hydration fails.
+    }
   }
 
   @override
