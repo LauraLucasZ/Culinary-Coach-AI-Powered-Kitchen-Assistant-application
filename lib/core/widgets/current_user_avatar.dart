@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:culinary_coach_app/core/utils/platform_file.dart';
+import 'package:culinary_coach_app/core/utils/profile_image_base64.dart';
+import 'package:culinary_coach_app/core/widgets/profile_avatar_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
@@ -15,6 +16,7 @@ class CurrentUserAvatar extends StatelessWidget {
     this.overrideImageUrl,
     this.overrideLocalPath,
     this.overrideImageBytes,
+    this.overrideProfileImageBase64,
     this.isLoadingOverlay = false,
   });
 
@@ -28,6 +30,7 @@ class CurrentUserAvatar extends StatelessWidget {
   final String? overrideImageUrl;
   final String? overrideLocalPath;
   final Uint8List? overrideImageBytes;
+  final String? overrideProfileImageBase64;
   final bool isLoadingOverlay;
 
   @override
@@ -81,42 +84,38 @@ class CurrentUserAvatar extends StatelessWidget {
       );
     }
 
-    Widget resolveFromFields({
-      required String? imageUrl,
+    Widget avatarContent({
+      required String? profileImageBase64,
       required String? localPath,
+      required String? imageUrl,
     }) {
-      final url = (imageUrl ?? '').trim();
-      final local = (localPath ?? '').trim();
+      final effectiveB64 = () {
+        final o = overrideProfileImageBase64?.trim();
+        if (o != null && o.isNotEmpty) return o;
+        final live = profileImageBase64?.trim();
+        if (live != null && live.isNotEmpty) return live;
+        return null;
+      }();
 
-      if (overrideImageBytes != null && overrideImageBytes!.isNotEmpty) {
-        return buildShell(
-          child: Image.memory(overrideImageBytes!, fit: BoxFit.cover),
-        );
-      }
-
-      final effectiveUrl = (overrideImageUrl ?? url).trim();
-      final effectiveLocal = (overrideLocalPath ?? local).trim();
-      final file = effectiveLocal.isNotEmpty
-          ? platformFileFromPath(effectiveLocal)
-          : null;
-
-      if (file != null) {
-        return buildShell(child: Image.file(file, fit: BoxFit.cover));
-      }
-      if (effectiveUrl.isNotEmpty) {
-        return buildShell(child: Image.network(effectiveUrl, fit: BoxFit.cover));
-      }
-      return buildShell(
-        child: Icon(
-          Icons.person,
-          color: Colors.white,
-          size: size * 0.55,
-        ),
+      return ProfileAvatarImage(
+        profileImageBase64: effectiveB64,
+        profileImageLocalPath: (overrideLocalPath ?? localPath),
+        profileImageUrl: (overrideImageUrl ?? imageUrl),
+        overrideImageBytes: overrideImageBytes,
+        allowLocalFile: true,
+        size: size,
+        iconColor: Colors.white,
       );
     }
 
     if (user == null) {
-      return resolveFromFields(imageUrl: null, localPath: null);
+      return buildShell(
+        child: avatarContent(
+          profileImageBase64: overrideProfileImageBase64,
+          localPath: overrideLocalPath,
+          imageUrl: overrideImageUrl,
+        ),
+      );
     }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -126,16 +125,19 @@ class CurrentUserAvatar extends StatelessWidget {
           .snapshots(),
       builder: (context, snapshot) {
         final data = snapshot.data?.data();
-        final url = (data?['profileImageUrl'] as String?)?.trim();
+        final b64 = readProfileImageBase64(data);
         final local = (data?['profileImageLocalPath'] as String?)?.trim();
+        final url = (data?['profileImageUrl'] as String?)?.trim();
         final authUrl = (user.photoURL ?? '').trim();
 
-        return resolveFromFields(
-          imageUrl: (url != null && url.isNotEmpty) ? url : authUrl,
-          localPath: local,
+        return buildShell(
+          child: avatarContent(
+            profileImageBase64: b64,
+            localPath: local,
+            imageUrl: (url != null && url.isNotEmpty) ? url : authUrl,
+          ),
         );
       },
     );
   }
 }
-

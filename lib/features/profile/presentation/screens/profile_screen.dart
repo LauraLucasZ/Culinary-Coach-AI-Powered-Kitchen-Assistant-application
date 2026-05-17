@@ -9,7 +9,7 @@ import 'package:culinary_coach_app/features/community/data/models/community_post
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
 import 'package:culinary_coach_app/features/community/presentation/widgets/community_post_card.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:culinary_coach_app/core/utils/profile_image_base64.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:culinary_coach_app/features/profile/presentation/screens/change_password_screen.dart';
@@ -56,21 +56,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final effectiveLocalPath = picked.path;
 
     try {
-      final ref = FirebaseStorage.instance.ref('users/$uid/profile.jpg');
-      await ref.putData(bytes);
-      final url = await ref.getDownloadURL();
+      final encoded = await encodeProfileImageBytesForFirestore(bytes);
+      if (encoded == null || encoded.isEmpty) {
+        throw StateError('Could not encode profile image.');
+      }
 
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'profileImageUrl': url,
-        'profileImageLocalPath': FieldValue.delete(),
+        'profileImageBase64': encoded,
+        'profileImageLocalPath': effectiveLocalPath,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-
-      try {
-        await currentUser.updatePhotoURL(url);
-      } catch (_) {
-        // Non-blocking.
-      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -79,27 +74,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _isAvatarUploading = false;
         _localAvatarBytes = null;
+        _localAvatarPath = null;
         _reloadToken++;
       });
-      return;
     } catch (_) {
-      // Firebase Storage not available or upload failed.
-      try {
-        await FirebaseFirestore.instance.collection('users').doc(uid).set({
-          'profileImageLocalPath': effectiveLocalPath,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      } catch (_) {
-        // ignore
-      }
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saved profile picture locally.')),
+        const SnackBar(content: Text('Could not save profile picture.')),
       );
       setState(() {
         _isAvatarUploading = false;
-        _reloadToken++;
       });
     }
   }
@@ -356,6 +340,8 @@ class _ProfileScaffold extends StatelessWidget {
     final otherProfileUid =
         isPrivateView ? '' : ((targetUid ?? '').trim());
     final firestoreImageUrl = (userData?['profileImageUrl'] as String?)?.trim();
+    final firestoreImageBase64 =
+        readProfileImageBase64(userData);
 
     final cookingLevel =
         _readString(userData, keys: ['cookingLevel', 'level', 'skillLevel']) ??
@@ -476,6 +462,7 @@ class _ProfileScaffold extends StatelessWidget {
                                   onTap: onAvatarTap,
                                   isLoadingOverlay: isAvatarUploading,
                                   overrideImageBytes: localAvatarBytes,
+                                  overrideLocalPath: localAvatarPath,
                                   backgroundColor: const Color(0xFFD28E18),
                                   borderColor:
                                       Colors.white.withValues(alpha: 0.7),
@@ -494,6 +481,7 @@ class _ProfileScaffold extends StatelessWidget {
                                   : AppDefaultUserAvatarByUid(
                                       userId: otherProfileUid,
                                       fallbackImageUrl: firestoreImageUrl,
+                                      fallbackImageBase64: firestoreImageBase64,
                                       size: 62,
                                       borderColor:
                                           Colors.white.withValues(alpha: 0.7),

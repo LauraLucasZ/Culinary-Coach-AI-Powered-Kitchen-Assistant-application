@@ -8,6 +8,7 @@ class AppDefaultUserAvatarByUid extends StatelessWidget {
     super.key,
     required this.userId,
     this.fallbackImageUrl,
+    this.fallbackImageBase64,
     this.size = 40,
     this.onTap,
     this.borderColor,
@@ -17,6 +18,7 @@ class AppDefaultUserAvatarByUid extends StatelessWidget {
 
   final String userId;
   final String? fallbackImageUrl;
+  final String? fallbackImageBase64;
   final double size;
   final VoidCallback? onTap;
   final Color? borderColor;
@@ -34,6 +36,7 @@ class AppDefaultUserAvatarByUid extends StatelessWidget {
     return UserAvatarByUid(
       userId: userId,
       fallbackImageUrl: fallbackImageUrl,
+      fallbackImageBase64: fallbackImageBase64,
       size: size,
       onTap: onTap,
       borderColor: borderColor ?? defaultBorder,

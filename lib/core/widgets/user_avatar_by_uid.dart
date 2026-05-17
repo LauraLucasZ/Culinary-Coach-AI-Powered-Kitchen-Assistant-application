@@ -1,15 +1,15 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:culinary_coach_app/core/utils/platform_file.dart';
+import 'package:culinary_coach_app/core/utils/profile_image_base64.dart';
+import 'package:culinary_coach_app/core/widgets/profile_avatar_image.dart';
 import 'package:flutter/material.dart';
 
-/// Avatar that follows the latest profile image from the `users/{userId}` doc,
-/// falling back to [fallbackImageUrl] (e.g. stale post/comment snapshot) when needed.
+/// Avatar that follows the latest profile image from the `users/{userId}` doc.
 class UserAvatarByUid extends StatelessWidget {
   const UserAvatarByUid({
     super.key,
     required this.userId,
     this.fallbackImageUrl,
+    this.fallbackImageBase64,
     this.size = 40,
     this.onTap,
     this.borderColor,
@@ -21,6 +21,7 @@ class UserAvatarByUid extends StatelessWidget {
 
   final String userId;
   final String? fallbackImageUrl;
+  final String? fallbackImageBase64;
   final double size;
   final VoidCallback? onTap;
   final Color? borderColor;
@@ -46,23 +47,21 @@ class UserAvatarByUid extends StatelessWidget {
         rs('avatarUrl');
   }
 
-  static String? _readLocal(Map<String, dynamic>? data) {
-    final v = data?['profileImageLocalPath'];
-    if (v is! String) return null;
-    final t = v.trim();
-    return t.isEmpty ? null : t;
-  }
-
   @override
   Widget build(BuildContext context) {
     final uid = userId.trim();
     final effectiveBorder =
         borderColor ?? Colors.white.withValues(alpha: 0.65);
+    final fbUrl = (fallbackImageUrl ?? '').trim();
+    final fbB64 = (fallbackImageBase64 ?? '').trim();
 
     Widget wrapHero(Widget child) {
       final tag = heroTag?.trim();
       if (tag == null || tag.isEmpty) return child;
-      return Hero(tag: tag, child: Material(type: MaterialType.transparency, child: child));
+      return Hero(
+        tag: tag,
+        child: Material(type: MaterialType.transparency, child: child),
+      );
     }
 
     Widget shell(Widget child) {
@@ -85,20 +84,16 @@ class UserAvatarByUid extends StatelessWidget {
     }
 
     if (uid.isEmpty) {
-      final fb = (fallbackImageUrl ?? '').trim();
-      if (fb.isNotEmpty) {
-        return wrapHero(
-          shell(
-            CachedNetworkImage(
-              imageUrl: fb,
-              fit: BoxFit.cover,
-              placeholder: (context, progress) => _placeholderIcon(),
-              errorWidget: (context, url, error) => _placeholderIcon(),
-            ),
+      return wrapHero(
+        shell(
+          ProfileAvatarImage(
+            fallbackImageBase64: fbB64.isEmpty ? null : fbB64,
+            fallbackImageUrl: fbUrl.isEmpty ? null : fbUrl,
+            size: size,
+            iconColor: iconColor,
           ),
-        );
-      }
-      return wrapHero(shell(_placeholderIcon()));
+        ),
+      );
     }
 
     return wrapHero(
@@ -106,41 +101,19 @@ class UserAvatarByUid extends StatelessWidget {
         stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
         builder: (context, snap) {
           final data = snap.data?.data();
-          final liveLocal = _readLocal(data);
-          final liveUrl = _readUrl(data);
-          final fb = (fallbackImageUrl ?? '').trim();
-
-          final file = liveLocal != null ? platformFileFromPath(liveLocal) : null;
-          if (file != null) {
-            return shell(Image.file(file, fit: BoxFit.cover));
-          }
-
-          final url = (liveUrl != null && liveUrl.isNotEmpty)
-              ? liveUrl
-              : (fb.isNotEmpty ? fb : null);
-
-          if (url != null && url.isNotEmpty) {
-            return shell(
-              CachedNetworkImage(
-                imageUrl: url,
-                fit: BoxFit.cover,
-                placeholder: (context, progress) => _placeholderIcon(),
-                errorWidget: (context, url, error) => _placeholderIcon(),
-              ),
-            );
-          }
-
-          return shell(_placeholderIcon());
+          return shell(
+            ProfileAvatarImage(
+              profileImageBase64: readProfileImageBase64(data),
+              fallbackImageBase64: fbB64.isEmpty ? null : fbB64,
+              profileImageUrl: _readUrl(data),
+              fallbackImageUrl: fbUrl.isEmpty ? null : fbUrl,
+              allowLocalFile: false,
+              size: size,
+              iconColor: iconColor,
+            ),
+          );
         },
       ),
-    );
-  }
-
-  Widget _placeholderIcon() {
-    return Icon(
-      Icons.person,
-      color: iconColor,
-      size: size * 0.55,
     );
   }
 }
