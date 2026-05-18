@@ -29,6 +29,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // keeps the main home state for pantry recipes, random recipes, and filter values
   final IngredientService _ingredientService = IngredientService();
   final FavoriteRecipesService _favoriteRecipesService =
       FavoriteRecipesService();
@@ -191,6 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _applyRecipeApiFilters(Map<String, String> params) {
+    // converts local filter choices into spoonacular query parameters
     if (_selectedMealType != 'Any')
       params['type'] = _selectedMealType.toLowerCase();
     if (_selectedCuisine != 'Any') params['cuisine'] = _selectedCuisine;
@@ -228,6 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
     String value,
     List<SavedIngredientSelection> selections,
   ) {
+    // uses debounce so api calls are not fired on every single keystroke
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 550), () {
       if (mounted) _findMatchedRecipes(selections);
@@ -235,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshAll(List<SavedIngredientSelection> selections) async {
+    // refreshes both lists in parallel so pull-to-refresh feels faster
     await Future.wait([
       _findMatchedRecipes(selections),
       _loadRandomRecipes(force: true),
@@ -242,6 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadRandomRecipes({bool force = false}) async {
+    // loads recommendation cards shown when there is no direct pantry search match
     if (_spoonacularKey.isEmpty) return;
     if (!force && _randomRecipes.isNotEmpty) return;
     if (_isLoadingRandom) return;
@@ -296,6 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _findMatchedRecipes(
     List<SavedIngredientSelection> selections,
   ) async {
+    // central method that decides between name search and pantry-ingredient search
     if (_spoonacularKey.isEmpty) {
       setState(
         () => _errorMessage =
@@ -375,6 +381,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<List<RecipeMatch>> _loadBulkRecipeDetails(
     List<RecipeMatch> recipes,
   ) async {
+    // fetches detailed recipe info in chunks to avoid long url/query limits
     final ids = recipes
         .map((recipe) => recipe.id)
         .where((id) => id > 0)
@@ -445,6 +452,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   bool _passesFilters(RecipeMatch recipe) {
+    // applies all active local filters before rendering cards in home sections
     final allText = [
       recipe.title,
       ...recipe.usedIngredients,
@@ -520,6 +528,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required RecipeMatch recipe,
     required bool isFavorite,
   }) async {
+    // optimistic favorite toggle for instant ui feedback then sync with firestore
     if (recipe.id <= 0) return;
     final nextValue = !isFavorite;
     setState(() => _favoriteOverrides[recipe.id] = nextValue);
@@ -582,6 +591,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String userId,
     required List<SavedIngredientSelection> selectedIngredients,
   }) {
+    // opens pantry dialog with live stream so changes appear without leaving the page
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -812,6 +822,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openFilterSheet(List<SavedIngredientSelection> selectedIngredients) {
+    // opens the home filter bottom sheet and updates list state in real time
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final sheetBg = isDarkMode ? const Color(0xFF121212) : const Color(0xFFFCF7E8);
     final topActionBg = isDarkMode ? const Color(0xFF232323) : Colors.white;
@@ -1077,6 +1088,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openSeeMore(String title, List<RecipeMatch> recipes) {
+    // navigates to the dedicated list screen with the currently prepared recipe set
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -2183,6 +2195,7 @@ class _ErrorCard extends StatelessWidget {
 }
 
 class _HomeTopHero extends StatelessWidget {
+  // reusable top header for home with profile, actions, and search bar
   const _HomeTopHero({
     required this.displayName,
     required this.searchController,
