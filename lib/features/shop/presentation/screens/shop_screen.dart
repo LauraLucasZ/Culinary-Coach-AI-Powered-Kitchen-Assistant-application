@@ -856,6 +856,12 @@ class _ShopScreenState extends State<ShopScreen> {
 
   // Opens shopping cart bottom sheet popup
   void _showCartPopup() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDarkMode ? const Color(0xFF1F1F1F) : _cardCream;
+    final cardBg = isDarkMode ? const Color(0xFF2A2A2A) : Colors.white;
+    final cardBorder = isDarkMode ? const Color(0xFF444444) : _border;
+    final titleColor = isDarkMode ? const Color(0xFFF2F2F2) : _brown;
+    final subtitleColor = isDarkMode ? const Color(0xFFBEBEBE) : _mutedBrown;
     final selectedItems = selectedIngredientsMap.values.where((item) => item.isChecked).toList();
 
     if (selectedItems.isEmpty) {
@@ -874,7 +880,7 @@ class _ShopScreenState extends State<ShopScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      backgroundColor: _cardCream,
+      backgroundColor: sheetBg,
       isScrollControlled: true,
       builder: (context) {
         return StatefulBuilder(
@@ -900,7 +906,7 @@ class _ShopScreenState extends State<ShopScreen> {
                       width: 50,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: _border,
+                        color: isDarkMode ? const Color(0xFF4A4A4A) : _border,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -908,15 +914,19 @@ class _ShopScreenState extends State<ShopScreen> {
                   const SizedBox(height: 20),
                   Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'Your Cart',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: _brown),
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: titleColor,
+                          ),
                         ),
                       ),
                       Text(
                         '${currentItems.length} items',
-                        style: const TextStyle(color: _mutedBrown, fontSize: 14),
+                        style: TextStyle(color: subtitleColor, fontSize: 14),
                       ),
                     ],
                   ),
@@ -939,9 +949,9 @@ class _ShopScreenState extends State<ShopScreen> {
                           margin: const EdgeInsets.only(bottom: 12),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: cardBg,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: _border),
+                            border: Border.all(color: cardBorder),
                           ),
                           child: Row(
                             children: [
@@ -956,12 +966,16 @@ class _ShopScreenState extends State<ShopScreen> {
                                   children: [
                                     Text(
                                       ingredient.name,
-                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _brown),
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color: titleColor,
+                                      ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       ingredient.category,
-                                      style: const TextStyle(fontSize: 12, color: _mutedBrown),
+                                      style: TextStyle(fontSize: 12, color: subtitleColor),
                                     ),
                                   ],
                                 ),
@@ -975,7 +989,7 @@ class _ShopScreenState extends State<ShopScreen> {
                                   ),
                                   Text(
                                     _getFormattedUnitPrice(ingredient),
-                                    style: const TextStyle(color: _mutedBrown, fontSize: 10),
+                                    style: TextStyle(color: subtitleColor, fontSize: 10),
                                   ),
                                   const SizedBox(height: 4),
                                   Row(
@@ -993,7 +1007,11 @@ class _ShopScreenState extends State<ShopScreen> {
                                       ),
                                       Text(
                                         _formatCartQuantity(ingredient, latestQuantity),
-                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 12,
+                                          color: titleColor,
+                                        ),
                                       ),
                                       IconButton(
                                         onPressed: () async {
@@ -1045,32 +1063,45 @@ class _ShopScreenState extends State<ShopScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: cardBg,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _border),
+                      border: Border.all(color: cardBorder),
                     ),
                     child: Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Subtotal', style: TextStyle(color: _mutedBrown)),
-                            Text('${_getFormattedTotal(total)}', style: const TextStyle(color: _brown, fontWeight: FontWeight.w600)),
+                            Text('Subtotal', style: TextStyle(color: subtitleColor)),
+                            Text(
+                              '${_getFormattedTotal(total)}',
+                              style: TextStyle(
+                                color: titleColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Delivery', style: TextStyle(color: _mutedBrown)),
-                            const Text('-', style: TextStyle(color: _mutedBrown)),
+                            Text('Delivery', style: TextStyle(color: subtitleColor)),
+                            Text('-', style: TextStyle(color: subtitleColor)),
                           ],
                         ),
                         const Divider(height: 24),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _brown)),
+                            Text(
+                              'Total',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: titleColor,
+                              ),
+                            ),
                             Text(_getFormattedTotal(total), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _orangeDark)),
                           ],
                         ),
@@ -1340,10 +1371,11 @@ class _ShopScreenState extends State<ShopScreen> {
     final currentUser = FirebaseAuth.instance.currentUser;
     final fallbackName = _extractFirstName(currentUser?.displayName) ?? 'Chef';
     final bottomSafePadding = MediaQuery.of(context).padding.bottom + 60.0;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     if (isLoading) {
-      return const Scaffold(
-        backgroundColor: background,
+      return Scaffold(
+        backgroundColor: isDarkMode ? const Color(0xFF121212) : background,
         body: Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(_orangeDark))),
       );
     }
@@ -1354,6 +1386,7 @@ class _ShopScreenState extends State<ShopScreen> {
         currentUser: currentUser,
         fallbackName: fallbackName,
         bottomSafePadding: bottomSafePadding,
+        isDarkMode: isDarkMode,
       );
     }
 
@@ -1398,6 +1431,7 @@ class _ShopScreenState extends State<ShopScreen> {
           currentUser: currentUser,
           fallbackName: fallbackName,
           bottomSafePadding: bottomSafePadding,
+          isDarkMode: isDarkMode,
         );
       },
     );
@@ -1408,9 +1442,10 @@ class _ShopScreenState extends State<ShopScreen> {
     required User? currentUser,
     required String fallbackName,
     required double bottomSafePadding,
+    required bool isDarkMode,
   }) {
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor: isDarkMode ? const Color(0xFF121212) : background,
       body: Column(
         children: [
           FutureBuilder<String?>(
@@ -1420,6 +1455,7 @@ class _ShopScreenState extends State<ShopScreen> {
               return _ShopTopHeader(
                 displayName: resolvedName,
                 cartCount: selectedCount,
+                isDarkMode: isDarkMode,
                 searchController: _searchController,
                 onSearchChanged: _handleSearchChanged,
                 onVoiceTap: _openVoiceSearch,
@@ -1447,7 +1483,14 @@ class _ShopScreenState extends State<ShopScreen> {
                       children: [
                         const Icon(Icons.error_outline, size: 48, color: Colors.red),
                         const SizedBox(height: 16),
-                        Text('Error: ${snapshot.error}'),
+                        Text(
+                          'Error: ${snapshot.error}',
+                          style: TextStyle(
+                            color: isDarkMode
+                                ? const Color(0xFFE3E3E3)
+                                : Colors.black87,
+                          ),
+                        ),
                         const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: () {
@@ -1473,10 +1516,10 @@ class _ShopScreenState extends State<ShopScreen> {
                   keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   slivers: [
                     if (!isCategoryOpened) ...[
-                      const SliverToBoxAdapter(
+                      SliverToBoxAdapter(
                         child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: GroceryHeader(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: GroceryHeader(isDarkMode: isDarkMode),
                         ),
                       ),
                       SliverToBoxAdapter(
@@ -1485,9 +1528,13 @@ class _ShopScreenState extends State<ShopScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
+                              Text(
                                 'Shop by Category',
-                                style: TextStyle(color: _brown, fontSize: 18, fontWeight: FontWeight.w700),
+                                style: TextStyle(
+                                  color: isDarkMode ? const Color(0xFFF2F2F2) : _brown,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               if (categories.length > 12)
                                 GestureDetector(
@@ -1523,6 +1570,7 @@ class _ShopScreenState extends State<ShopScreen> {
                                 imagePath: _categoryIconPath(category),
                                 icon: null,
                                 isSelected: false,
+                                isDarkMode: isDarkMode,
                                 onTap: () => setState(() {
                                   selectedCategory = category;
                                   isCategoryOpened = true;
@@ -1535,15 +1583,19 @@ class _ShopScreenState extends State<ShopScreen> {
                           ),
                         ),
                       ),
-                      const SliverToBoxAdapter(
+                      SliverToBoxAdapter(
                         child: Padding(
-                          padding: EdgeInsets.fromLTRB(18, 24, 18, 10),
+                          padding: const EdgeInsets.fromLTRB(18, 24, 18, 10),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 '🔥 Best Sellers',
-                                style: TextStyle(color: _brown, fontSize: 18, fontWeight: FontWeight.w700),
+                                style: TextStyle(
+                                  color: isDarkMode ? const Color(0xFFF2F2F2) : _brown,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ],
                           ),
@@ -1578,6 +1630,7 @@ class _ShopScreenState extends State<ShopScreen> {
                                   child: _BestSellerCard(
                                     ingredient: ingredient,
                                     isSelected: isSelected,
+                                    isDarkMode: isDarkMode,
                                     price: price,
                                     rank: rank,
                                     formattedPrice: _getFormattedPrice(ingredient),
@@ -1609,11 +1662,17 @@ class _ShopScreenState extends State<ShopScreen> {
                                   height: 38,
                                   width: 38,
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
+                                    color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: _border),
+                                    border: Border.all(
+                                      color: isDarkMode ? const Color(0xFF444444) : _border,
+                                    ),
                                   ),
-                                  child: const Icon(Icons.arrow_back_rounded, color: _orangeDark, size: 22),
+                                  child: Icon(
+                                    Icons.arrow_back_rounded,
+                                    color: isDarkMode ? const Color(0xFFF2F2F2) : _orangeDark,
+                                    size: 22,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -1623,14 +1682,22 @@ class _ShopScreenState extends State<ShopScreen> {
                                   children: [
                                     Text(
                                       _openedTitle(ingredients),
-                                      style: const TextStyle(color: _brown, fontSize: 20, fontWeight: FontWeight.w800),
+                                      style: TextStyle(
+                                        color: isDarkMode ? const Color(0xFFF2F2F2) : _brown,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       searchQuery.trim().isEmpty
                                           ? '${ingredients.length} ${ingredients.length == 1 ? 'item' : 'items'} available'
                                           : '${ingredients.length} ${ingredients.length == 1 ? 'result' : 'results'} found',
-                                      style: const TextStyle(color: _mutedBrown, fontSize: 14, fontWeight: FontWeight.w600),
+                                      style: TextStyle(
+                                        color: isDarkMode ? const Color(0xFFBEBEBE) : _mutedBrown,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -1652,15 +1719,22 @@ class _ShopScreenState extends State<ShopScreen> {
                         ),
                       ),
                       if (ingredients.isEmpty)
-                        const SliverFillRemaining(
+                        SliverFillRemaining(
                           hasScrollBody: false,
                           child: Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.search_off, size: 54, color: _orangeDark),
-                                SizedBox(height: 12),
-                                Text('No ingredients found', style: TextStyle(color: _brown, fontSize: 16, fontWeight: FontWeight.w600)),
+                                const Icon(Icons.search_off, size: 54, color: _orangeDark),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No ingredients found',
+                                  style: TextStyle(
+                                    color: isDarkMode ? const Color(0xFFE3E3E3) : _brown,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -1679,6 +1753,7 @@ class _ShopScreenState extends State<ShopScreen> {
                                 return _ShopIngredientCard(
                                   ingredient: ingredient,
                                   isSelected: isSelected,
+                                  isDarkMode: isDarkMode,
                                   price: price,
                                   formattedPrice: _getFormattedPrice(ingredient),
                                   unit: _getUnitText(ingredient),
@@ -1764,7 +1839,8 @@ class _ShopScreenState extends State<ShopScreen> {
 
 // Promotional grocery banner section
 class GroceryHeader extends StatelessWidget {
-  const GroceryHeader({super.key});
+  const GroceryHeader({super.key, this.isDarkMode = false});
+  final bool isDarkMode;
 
   @override
   // Builds the complete shop screen UI
@@ -1776,10 +1852,14 @@ class GroceryHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 colors: [
-                  Color(0xFFFFD6A5),
-                  Color(0xFFFFF0E0),
+                  isDarkMode
+                      ? const Color(0xFF2A2A2A)
+                      : const Color(0xFFFFD6A5),
+                  isDarkMode
+                      ? const Color(0xFF3A3A3A)
+                      : const Color(0xFFFFF0E0),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -1787,7 +1867,10 @@ class GroceryHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFFD6A5).withOpacity(0.25),
+                  color: (isDarkMode
+                          ? const Color(0xFF000000)
+                          : const Color(0xFFFFD6A5))
+                      .withOpacity(0.25),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -1802,7 +1885,9 @@ class GroceryHeader extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.85),
+                          color: isDarkMode
+                              ? Colors.white.withOpacity(0.12)
+                              : Colors.white.withOpacity(0.85),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Text(
@@ -1815,20 +1900,24 @@ class GroceryHeader extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
+                      Text(
                         "Fresh ingredients,\ndelivered fast 🚀",
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF3A2214),
+                          color: isDarkMode
+                              ? const Color(0xFFF2F2F2)
+                              : const Color(0xFF3A2214),
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
+                      Text(
                         "Get market-fresh groceries\nat your door in 30 mins.",
                         style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF8B7355),
+                          color: isDarkMode
+                              ? const Color(0xFFC6C6C6)
+                              : const Color(0xFF8B7355),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -1839,7 +1928,9 @@ class GroceryHeader extends StatelessWidget {
                   width: 110,
                   height: 110,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.4),
+                    color: isDarkMode
+                        ? Colors.white.withOpacity(0.08)
+                        : Colors.white.withOpacity(0.4),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: ClipRRect(
@@ -1866,6 +1957,7 @@ class _ShopTopHeader extends StatelessWidget {
   const _ShopTopHeader({
     required this.displayName,
     required this.cartCount,
+    required this.isDarkMode,
     required this.searchController,
     required this.onSearchChanged,
     required this.onVoiceTap,
@@ -1877,6 +1969,7 @@ class _ShopTopHeader extends StatelessWidget {
 
   final String displayName;
   final int cartCount;
+  final bool isDarkMode;
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onVoiceTap;
@@ -1892,6 +1985,22 @@ class _ShopTopHeader extends StatelessWidget {
     final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
     final isCompact = isLandscape;
     final heroTitleSize = isCompact ? 16.0 : 23.0;
+    final heroGradient = isDarkMode
+        ? const [Color(0xFF1A1A1A), Color(0xFF2D2D2D), Color(0xFF3D3D3D)]
+        : const [Color(0xFFCC7705), Color(0xFFDD8E1E), Color(0xFFF0A73A)];
+    final avatarBg = isDarkMode ? const Color(0xFF444444) : const Color(0xFFD28E18);
+    final headerButtonBg = isDarkMode ? const Color(0xFF444444) : Colors.white;
+    final headerButtonIcon = isDarkMode ? Colors.white70 : const Color(0xFF6C6C6C);
+    final searchBg = isDarkMode ? const Color(0xFF2A2A2A) : Colors.white;
+    final searchIconColor = isDarkMode
+        ? const Color(0xFFD0D0D0)
+        : const Color(0xFF888888);
+    final searchTextColor = isDarkMode
+        ? const Color(0xFFE3E3E3)
+        : const Color(0xFF2F2F2F);
+    final searchHintColor = isDarkMode
+        ? const Color(0xFFB0B0B0)
+        : const Color(0xFF6A6A6A);
 
     return Container(
       width: double.infinity,
@@ -1901,14 +2010,14 @@ class _ShopTopHeader extends StatelessWidget {
         18,
         isCompact ? 8 : 18,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFCC7705), Color(0xFFDD8E1E), Color(0xFFF0A73A)],
+          colors: heroGradient,
           stops: [0.0, 0.35, 1.0],
         ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
       ),
       child: Stack(
         children: [
@@ -1927,7 +2036,7 @@ class _ShopTopHeader extends StatelessWidget {
                       onTap: onProfileTap,
                       child: CurrentUserAvatar(
                         size: 40,
-                        backgroundColor: Color(0xFFD28E18),
+                        backgroundColor: avatarBg,
                         borderWidth: 0,
                       ),
                     ),
@@ -1959,18 +2068,24 @@ class _ShopTopHeader extends StatelessWidget {
                     icon: Icons.shopping_cart_outlined,
                     onTap: onCartTap,
                     badgeCount: cartCount,
+                    backgroundColor: headerButtonBg,
+                    iconColor: headerButtonIcon,
                   ),
                   const SizedBox(width: 8),
                   if (onOrdersTap != null) ...[
                     _CircleActionButton(
                       icon: Icons.receipt_long_outlined,
                       onTap: onOrdersTap!,
+                      backgroundColor: headerButtonBg,
+                      iconColor: headerButtonIcon,
                     ),
                     const SizedBox(width: 8),
                   ],
                   _CircleActionButton(
                     icon: Icons.settings_outlined,
                     onTap: onSettingsTap,
+                    backgroundColor: headerButtonBg,
+                    iconColor: headerButtonIcon,
                   ),
                 ],
               ),
@@ -2001,7 +2116,7 @@ class _ShopTopHeader extends StatelessWidget {
                 height: isCompact ? 40 : 50,
                 padding: const EdgeInsets.only(left: 16, right: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: searchBg,
                   borderRadius: BorderRadius.circular(27),
                   boxShadow: [
                     BoxShadow(
@@ -2013,9 +2128,9 @@ class _ShopTopHeader extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.search_rounded,
-                      color: Color(0xFF888888),
+                      color: searchIconColor,
                       size: 28,
                     ),
                     const SizedBox(width: 8),
@@ -2023,11 +2138,11 @@ class _ShopTopHeader extends StatelessWidget {
                       child: TextField(
                         controller: searchController,
                         onChanged: onSearchChanged,
-                        cursorColor: const Color(0xFF6A6A6A),
-                        style: const TextStyle(color: Color(0xFF2F2F2F)),
-                        decoration: const InputDecoration(
+                        cursorColor: searchIconColor,
+                        style: TextStyle(color: searchTextColor),
+                        decoration: InputDecoration(
                           hintText: 'Search ingredients...',
-                          hintStyle: TextStyle(color: Color(0xFF6A6A6A)),
+                          hintStyle: TextStyle(color: searchHintColor),
                           filled: false,
                           fillColor: Colors.transparent,
                           border: InputBorder.none,
@@ -2040,9 +2155,11 @@ class _ShopTopHeader extends StatelessWidget {
                     ),
                     IconButton(
                       onPressed: onVoiceTap,
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.keyboard_voice_rounded,
-                        color: Color(0xFF4D4D4D),
+                        color: isDarkMode
+                            ? const Color(0xFFD0D0D0)
+                            : const Color(0xFF4D4D4D),
                         size: 27,
                       ),
                       splashRadius: 18,
@@ -2064,11 +2181,19 @@ class _ShopTopHeader extends StatelessWidget {
 
 // Reusable circular icon button with optional badge
 class _CircleActionButton extends StatelessWidget {
-  const _CircleActionButton({required this.icon, required this.onTap, this.badgeCount = 0});
+  const _CircleActionButton({
+    required this.icon,
+    required this.onTap,
+    this.badgeCount = 0,
+    this.backgroundColor = Colors.white,
+    this.iconColor = const Color(0xFF6C6C6C),
+  });
 
   final IconData icon;
   final VoidCallback onTap;
   final int badgeCount;
+  final Color backgroundColor;
+  final Color iconColor;
 
   @override
   // Builds the complete shop screen UI
@@ -2081,11 +2206,11 @@ class _CircleActionButton extends StatelessWidget {
           Container(
             height: 40,
             width: 40,
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: backgroundColor,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: const Color(0xFF6C6C6C), size: 21),
+            child: Icon(icon, color: iconColor, size: 21),
           ),
           if (badgeCount > 0)
             Positioned(
@@ -2154,13 +2279,21 @@ class _HeroBackgroundPainter extends CustomPainter {
 
 // Displays one grocery category tile
 class _CategoryTile extends StatelessWidget {
-  const _CategoryTile({required this.title, required this.imagePath, this.icon, required this.isSelected, required this.onTap});
+  const _CategoryTile({
+    required this.title,
+    required this.imagePath,
+    this.icon,
+    required this.isSelected,
+    required this.onTap,
+    this.isDarkMode = false,
+  });
 
   final String title;
   final String imagePath;
   final IconData? icon;
   final bool isSelected;
   final VoidCallback onTap;
+  final bool isDarkMode;
 
   @override
   // Builds the complete shop screen UI
@@ -2182,13 +2315,19 @@ class _CategoryTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFFFFF8E9).withOpacity(0.95)
-              : Colors.white.withOpacity(0.9),
+              ? (isDarkMode
+                  ? const Color(0xFF2F2A23).withOpacity(0.95)
+                  : const Color(0xFFFFF8E9).withOpacity(0.95))
+              : (isDarkMode
+                  ? const Color(0xFF232323).withOpacity(0.95)
+                  : Colors.white.withOpacity(0.9)),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
                 ? const Color(0xFFB87313).withOpacity(0.8)
-                : Colors.white.withOpacity(0.5),
+                : (isDarkMode
+                    ? const Color(0xFF444444)
+                    : Colors.white.withOpacity(0.5)),
             width: isSelected ? 1.5 : 1,
           ),
           boxShadow: isSelected
@@ -2220,8 +2359,14 @@ class _CategoryTile extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFFF7F1DE).withOpacity(0.7),
-                    const Color(0xFFFCF7E8).withOpacity(0.5),
+                    (isDarkMode
+                            ? const Color(0xFF2A2A2A)
+                            : const Color(0xFFF7F1DE))
+                        .withOpacity(0.7),
+                    (isDarkMode
+                            ? const Color(0xFF333333)
+                            : const Color(0xFFFCF7E8))
+                        .withOpacity(0.5),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(18),
@@ -2268,7 +2413,11 @@ class _CategoryTile extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: isSelected ? const Color(0xFFB87313) : const Color(0xFF3A2214),
+                  color: isSelected
+                      ? const Color(0xFFB87313)
+                      : (isDarkMode
+                          ? const Color(0xFFE3E3E3)
+                          : const Color(0xFF3A2214)),
                   fontSize: fontSize,
                   fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                   height: 1.2,
@@ -2287,6 +2436,7 @@ class _ShopIngredientCard extends StatelessWidget {
   const _ShopIngredientCard({
     required this.ingredient,
     required this.isSelected,
+    required this.isDarkMode,
     required this.price,
     required this.formattedPrice,
     required this.unit,
@@ -2297,6 +2447,7 @@ class _ShopIngredientCard extends StatelessWidget {
 
   final IngredientModel ingredient;
   final bool isSelected;
+  final bool isDarkMode;
   final double price;
   final String formattedPrice;
   final String unit;
@@ -2424,10 +2575,14 @@ class _ShopIngredientCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDarkMode ? const Color(0xFF232323) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? const Color(0xFFB87313) : const Color(0xFFE8DCC8),
+            color: isSelected
+                ? const Color(0xFFB87313)
+                : (isDarkMode
+                    ? const Color(0xFF444444)
+                    : const Color(0xFFE8DCC8)),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: [
@@ -2445,7 +2600,9 @@ class _ShopIngredientCard extends StatelessWidget {
               width: 90,
               height: 90,
               decoration: BoxDecoration(
-                color: const Color(0xFFF7F1DE),
+                color: isDarkMode
+                    ? const Color(0xFF2D2D2D)
+                    : const Color(0xFFF7F1DE),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: ClipRRect(
@@ -2486,8 +2643,10 @@ class _ShopIngredientCard extends StatelessWidget {
                       children: [
                         Text(
                           ingredient.name,
-                          style: const TextStyle(
-                            color: Color(0xFF3A2214),
+                          style: TextStyle(
+                            color: isDarkMode
+                                ? const Color(0xFFF2F2F2)
+                                : const Color(0xFF3A2214),
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
@@ -2509,8 +2668,10 @@ class _ShopIngredientCard extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             _unitPriceDisplay,
-                            style: const TextStyle(
-                              color: Color(0xFF8B7355),
+                            style: TextStyle(
+                              color: isDarkMode
+                                  ? const Color(0xFFBEBEBE)
+                                  : const Color(0xFF8B7355),
                               fontSize: 10.5,
                               fontWeight: FontWeight.w500,
                             ),
@@ -2543,6 +2704,7 @@ class _ShopIngredientCard extends StatelessWidget {
                 quantityText: _formatQuantityDisplay(quantity),
                 onEdit: () => _openDetails(context),
                 onRemove: onAddToCart,
+                isDarkMode: isDarkMode,
               )
                   : _AddCardButton(onTap: () async => _openDetails(context)),
             ),
@@ -2627,11 +2789,13 @@ class _SelectedCardActions extends StatefulWidget {
     required this.quantityText,
     required this.onEdit,
     required this.onRemove,
+    this.isDarkMode = false,
   });
 
   final String quantityText;
   final VoidCallback onEdit;
   final Future<void> Function() onRemove;
+  final bool isDarkMode;
 
   @override
   State<_SelectedCardActions> createState() => _SelectedCardActionsState();
@@ -2661,9 +2825,16 @@ class _SelectedCardActionsState extends State<_SelectedCardActions> {
           constraints: const BoxConstraints(maxWidth: 82),
           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF7E6),
+          color: widget.isDarkMode
+              ? const Color(0xFF2F2A23)
+              : const Color(0xFFFFF7E6),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2C9A4), width: 1),
+          border: Border.all(
+            color: widget.isDarkMode
+                ? const Color(0xFF4A4A4A)
+                : const Color(0xFFE2C9A4),
+            width: 1,
+          ),
           ),
           child: Text(
             widget.quantityText,
@@ -2683,12 +2854,14 @@ class _SelectedCardActionsState extends State<_SelectedCardActions> {
             _SmallCardIconButton(
               icon: Icons.edit_outlined,
               onTap: widget.onEdit,
+              isDarkMode: widget.isDarkMode,
             ),
             const SizedBox(width: 6),
             _SmallCardIconButton(
               icon: Icons.delete_outline,
               isBusy: _removing,
               onTap: _handleRemove,
+              isDarkMode: widget.isDarkMode,
             ),
           ],
         ),
@@ -2702,11 +2875,13 @@ class _SmallCardIconButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.isBusy = false,
+    this.isDarkMode = false,
   });
 
   final IconData icon;
   final VoidCallback onTap;
   final bool isBusy;
+  final bool isDarkMode;
 
   @override
   // Builds the complete shop screen UI
@@ -2717,9 +2892,12 @@ class _SmallCardIconButton extends StatelessWidget {
         width: 32,
         height: 32,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
           shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFE2C9A4), width: 1),
+          border: Border.all(
+            color: isDarkMode ? const Color(0xFF444444) : const Color(0xFFE2C9A4),
+            width: 1,
+          ),
         ),
         alignment: Alignment.center,
         child: isBusy
@@ -2742,6 +2920,7 @@ class _BestSellerCard extends StatelessWidget {
   const _BestSellerCard({
     required this.ingredient,
     required this.isSelected,
+    required this.isDarkMode,
     required this.price,
     required this.rank,
     required this.formattedPrice,
@@ -2751,6 +2930,7 @@ class _BestSellerCard extends StatelessWidget {
 
   final IngredientModel ingredient;
   final bool isSelected;
+  final bool isDarkMode;
   final double price;
   final int rank;
   final String formattedPrice;
@@ -2771,9 +2951,16 @@ class _BestSellerCard extends StatelessWidget {
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFFF7E6) : Colors.white,
+          color: isSelected
+              ? (isDarkMode ? const Color(0xFF2F2A23) : const Color(0xFFFFF7E6))
+              : (isDarkMode ? const Color(0xFF232323) : Colors.white),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? const Color(0xFFB87313) : const Color(0xFFE2C9A4), width: isSelected ? 2 : 1),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFFB87313)
+                : (isDarkMode ? const Color(0xFF444444) : const Color(0xFFE2C9A4)),
+            width: isSelected ? 2 : 1,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -2828,8 +3015,10 @@ class _BestSellerCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   ingredient.name,
-                  style: const TextStyle(
-                    color: Color(0xFF3A2214),
+                  style: TextStyle(
+                    color: isDarkMode
+                        ? const Color(0xFFF2F2F2)
+                        : const Color(0xFF3A2214),
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                   ),

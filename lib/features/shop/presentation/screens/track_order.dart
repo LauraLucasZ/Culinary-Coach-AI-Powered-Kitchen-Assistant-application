@@ -31,13 +31,14 @@ class _MapZoomButton extends StatelessWidget {
   @override
   // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: 38,
         height: 38,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
@@ -498,19 +499,22 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   @override
   // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldColor = isDarkMode ? const Color(0xFF121212) : _background;
+    final primaryText = isDarkMode ? const Color(0xFFF2F2F2) : _brown;
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: scaffoldColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_ios, color: _brown, size: 20),
+          icon: Icon(Icons.arrow_back_ios, color: primaryText, size: 20),
         ),
         title: Text(
           _hasArrived ? 'Order Arrived' : 'Track Order',
-          style: const TextStyle(
-            color: _brown,
+          style: TextStyle(
+            color: primaryText,
             fontSize: 24,
             fontWeight: FontWeight.w600,
           ),
@@ -543,6 +547,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
   // Builds interactive tracking map UI
   Widget _buildMapCard() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
       height: 320,
       margin: const EdgeInsets.all(16),
@@ -590,7 +595,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
             ),
             if (_loadingLocation || _loadingRoute)
               Container(
-                color: Colors.white.withOpacity(0.65),
+                color: (isDarkMode
+                        ? const Color(0xFF121212)
+                        : Colors.white)
+                    .withOpacity(0.65),
                 child: const Center(
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(_orange),
@@ -619,7 +627,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
               bottom: 12,
               child: FloatingActionButton.small(
                 heroTag: null,
-                backgroundColor: Colors.white,
+                backgroundColor: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
                 elevation: 2,
                 onPressed: () {
                   _mapController.move(_driverLocation, 15);
@@ -635,6 +643,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
   // Displays warning messages related to map or location issues
   Widget _buildWarningCard() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       padding: const EdgeInsets.all(12),
@@ -650,8 +659,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
           Expanded(
             child: Text(
               _mapError!,
-              style: const TextStyle(
-                color: _brown,
+              style: TextStyle(
+                color: isDarkMode ? const Color(0xFFE3E3E3) : _brown,
                 fontSize: 12,
               ),
             ),
@@ -663,12 +672,13 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
   // Displays current driver information and delivery status
   Widget _buildDriverCard() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final arrived = _hasArrived;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Row(
         children: [
           Container(
@@ -691,15 +701,18 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
               children: [
                 Text(
                   arrived ? 'Delivered By' : 'Your Driver',
-                  style: const TextStyle(fontSize: 12, color: _muted),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDarkMode ? const Color(0xFFBEBEBE) : _muted,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   widget.driverName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: _brown,
+                    color: isDarkMode ? const Color(0xFFF2F2F2) : _brown,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -804,10 +817,11 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
   // Displays detailed order and delivery information
   Widget _buildOrderDetailsCard() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         children: [
           _buildDetailRow('Order ID', widget.orderId),
@@ -846,10 +860,17 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   }
 
   Widget _buildDetailRow(String label, String value, {Color valueColor = _brown}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 14, color: _muted)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: isDarkMode ? const Color(0xFFBEBEBE) : _muted,
+          ),
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -860,7 +881,9 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: valueColor,
+              color: valueColor == _brown && isDarkMode
+                  ? const Color(0xFFF2F2F2)
+                  : valueColor,
             ),
           ),
         ),
@@ -869,7 +892,8 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   }
 
   Widget _buildStatusTitle() {
-    return const Padding(
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16),
       child: Align(
         alignment: Alignment.centerLeft,
@@ -878,7 +902,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: _brown,
+            color: isDarkMode ? const Color(0xFFF2F2F2) : _brown,
           ),
         ),
       ),
@@ -895,7 +919,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Column(
         children: [
           _buildTimelineItem(
@@ -939,6 +963,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
     bool isFirst = false,
     bool isLast = false,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -977,15 +1002,19 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: isCompleted ? _brown : _muted,
+                    color: isCompleted
+                        ? (isDarkMode ? const Color(0xFFF2F2F2) : _brown)
+                        : (isDarkMode ? const Color(0xFFBEBEBE) : _muted),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   time,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Color(0xFFA08F7E),
+                    color: isDarkMode
+                        ? const Color(0xFFB0B0B0)
+                        : const Color(0xFFA08F7E),
                   ),
                 ),
               ],
@@ -1041,11 +1070,17 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
   // Shows confirmation dialog for calling driver
   void _showCallDriverDialog(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: const Text('Call Driver'),
+        backgroundColor: isDarkMode ? const Color(0xFF1F1F1F) : Colors.white,
+        title: Text(
+          'Call Driver',
+          style: TextStyle(
+            color: isDarkMode ? const Color(0xFFF2F2F2) : Colors.black,
+          ),
+        ),
         content: Text('Do you want to call ${widget.driverName}?'),
         actions: [
           TextButton(
@@ -1064,12 +1099,23 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
 
   // Shows placeholder message dialog for messaging driver
   void _showMessageDriverDialog(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: const Text('Message Driver'),
-        content: const Text('Messaging feature will be available soon.'),
+        backgroundColor: isDarkMode ? const Color(0xFF1F1F1F) : Colors.white,
+        title: Text(
+          'Message Driver',
+          style: TextStyle(
+            color: isDarkMode ? const Color(0xFFF2F2F2) : Colors.black,
+          ),
+        ),
+        content: Text(
+          'Messaging feature will be available soon.',
+          style: TextStyle(
+            color: isDarkMode ? const Color(0xFFBEBEBE) : Colors.black87,
+          ),
+        ),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
@@ -1082,9 +1128,10 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   }
 
   // Shared card styling used across the screen
-  BoxDecoration _cardDecoration() {
+  BoxDecoration _cardDecoration(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return BoxDecoration(
-      color: Colors.white,
+      color: isDarkMode ? const Color(0xFF232323) : Colors.white,
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
