@@ -1,3 +1,6 @@
+// Model for one story in Firestore (image as Base64, expires after ~24 hours).
+// CommunityStoryRing bundles one user's active stories for the strip UI.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Community story stored in Firestore (base64 image, no Firebase Storage).
@@ -32,8 +35,10 @@ class CommunityStory {
 
   /// Effective expiry for "active" UI: use [expiresAt] when it is valid and not before
   /// [createdAt]; otherwise treat as missing/invalid and use [createdAt] + 24h.
+  // Stories hide from the strip after this time (default 24h from createdAt if expiresAt missing).
   DateTime get resolvedExpiresAt {
     final c = createdAt;
+
     final fallback = c.millisecondsSinceEpoch > 0
         ? c.add(const Duration(hours: 24))
         : DateTime.fromMillisecondsSinceEpoch(0);
@@ -57,8 +62,10 @@ class CommunityStory {
   /// Archive list thumbnail (image only; legacy video-only stories may be empty).
   String get archiveThumbBase64 => imageBase64;
 
+  // Parse Firestore document into a CommunityStory for the viewer and archive list.
   static CommunityStory fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? const <String, dynamic>{};
+
     final created = _readTime(data['createdAt']);
     final expires = _readTime(data['expiresAt']);
     final likedRaw = data['likedBy'];
@@ -120,7 +127,7 @@ class CommunityStory {
   }
 }
 
-/// Active stories for one user (for the stories strip / viewer), newest last for paging.
+// One user's ring on the stories strip — list of their non-expired stories.
 class CommunityStoryRing {
   const CommunityStoryRing({
     required this.userId,

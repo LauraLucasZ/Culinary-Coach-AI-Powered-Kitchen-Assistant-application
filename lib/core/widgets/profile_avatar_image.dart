@@ -1,3 +1,6 @@
+// Renders a profile picture inside a circle — tries Base64, file, URL, then default icon.
+// StatelessWidget: parent passes new data and Flutter rebuilds this widget's build().
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:culinary_coach_app/core/utils/platform_file.dart';
 import 'package:culinary_coach_app/core/utils/profile_image_base64.dart';
@@ -34,11 +37,16 @@ class ProfileAvatarImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // --- Profile image loading order (first match wins) ---
+    // 1) override bytes  2) Firestore Base64  3) local file  4) network URL  5) default icon
+
+    // Instant preview bytes (e.g. right after picking from gallery) — no Firestore wait.
     final preview = overrideImageBytes;
     if (preview != null && preview.isNotEmpty) {
       return _memoryImage(preview);
     }
 
+    // Decode profileImageBase64 string from Firestore into raw image bytes.
     final primaryB64 = tryDecodeProfileImageBase64(profileImageBase64);
     if (primaryB64 != null) {
       return _memoryImage(primaryB64);
@@ -49,6 +57,7 @@ class ProfileAvatarImage extends StatelessWidget {
       return _memoryImage(fallbackB64);
     }
 
+    // Local file path (current user only) — faster preview before Firestore sync.
     if (allowLocalFile) {
       final local = (profileImageLocalPath ?? '').trim();
       if (local.isNotEmpty) {
@@ -63,6 +72,7 @@ class ProfileAvatarImage extends StatelessWidget {
       }
     }
 
+    // Legacy/network URL (e.g. Google sign-in photoURL) if no Base64 on the user doc.
     final url = _firstNonEmpty([profileImageUrl, fallbackImageUrl]);
     if (url != null) {
       return CachedNetworkImage(
@@ -73,6 +83,7 @@ class ProfileAvatarImage extends StatelessWidget {
       );
     }
 
+    // Fallback: person icon when no image source is available.
     return _defaultAvatar();
   }
 
@@ -84,6 +95,7 @@ class ProfileAvatarImage extends StatelessWidget {
     return null;
   }
 
+  // MemoryImage (via Image.memory) displays an image stored in RAM after Base64 decode.
   Widget _memoryImage(Uint8List bytes) {
     return Image.memory(
       bytes,

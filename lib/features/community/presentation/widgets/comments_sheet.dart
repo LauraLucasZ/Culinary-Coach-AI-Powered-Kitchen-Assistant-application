@@ -1,3 +1,6 @@
+// Bottom sheet for post comments — live list from Firestore, add comment or reply.
+// StatefulWidget for text field; StreamBuilder rebuilds when new comments arrive.
+
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/core/widgets/app_default_user_avatar.dart';
 import 'package:culinary_coach_app/core/widgets/current_user_avatar.dart';
@@ -8,12 +11,15 @@ import 'package:culinary_coach_app/features/community/presentation/widgets/commu
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+// Bottom sheet: list comments on a post, add comment or reply via Firestore.
 class CommentsSheet extends StatefulWidget {
   const CommentsSheet({required this.postId, super.key});
 
   final String postId;
 
+  // Opens this sheet as a modal over the current screen.
   static Future<void> show(BuildContext context, {required String postId}) {
+    // showModalBottomSheet slides this widget up over the current route.
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -26,6 +32,7 @@ class CommentsSheet extends StatefulWidget {
   State<CommentsSheet> createState() => _CommentsSheetState();
 }
 
+// StatefulWidget State: text field, reply target, sending flag — setState refreshes UI.
 class _CommentsSheetState extends State<CommentsSheet> {
   final _controller = TextEditingController();
   bool _sending = false;
@@ -37,6 +44,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
     super.dispose();
   }
 
+  // setState rebuilds the sheet to show "replying to" banner and prefilled @name.
   void _startReply(CommunityComment c) {
     setState(() {
       _replyingTo = c;
@@ -52,6 +60,8 @@ class _CommentsSheetState extends State<CommentsSheet> {
     });
   }
 
+  // Writes a top-level comment or a nested reply through CommunityRepository.
+  // async/await: write comment or reply to Firestore, then clear field via setState.
   Future<void> _send(CommunityRepository repo) async {
     final raw = _controller.text;
     final text = raw.trim();
@@ -83,6 +93,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
     final repo = CommunityRepository();
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
 
+    // Column widget tree: handle, title row, Flexible comment ListView, input row at bottom.
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: ClipRRect(
@@ -124,6 +135,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                 ),
                 Flexible(
                   child: StreamBuilder(
+                    // Real-time comments subcollection for this post.
                     stream: repo.watchComments(widget.postId),
                     builder: (context, snapshot) {
                       final comments = snapshot.data ?? const [];
@@ -163,6 +175,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                     },
                   ),
                 ),
+                // --- Comment input section (only when signed in) ---
                 if (currentUid != null) ...[
                   if (_replyingTo != null)
                     Padding(
@@ -278,6 +291,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
   }
 }
 
+// One comment with like button and nested replies.
 class _CommentBlock extends StatelessWidget {
   const _CommentBlock({
     required this.postId,

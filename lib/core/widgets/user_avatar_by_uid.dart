@@ -1,3 +1,6 @@
+// Another user's avatar by uid — StreamBuilder listens to their users/{uid} document.
+// Shows updated profileImageBase64 when they change their photo without restarting the app.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/core/utils/profile_image_base64.dart';
 import 'package:culinary_coach_app/core/widgets/profile_avatar_image.dart';
@@ -55,6 +58,7 @@ class UserAvatarByUid extends StatelessWidget {
     final fbUrl = (fallbackImageUrl ?? '').trim();
     final fbB64 = (fallbackImageBase64 ?? '').trim();
 
+    // --- Optional Hero animation when navigating to profile ---
     Widget wrapHero(Widget child) {
       final tag = heroTag?.trim();
       if (tag == null || tag.isEmpty) return child;
@@ -64,6 +68,7 @@ class UserAvatarByUid extends StatelessWidget {
       );
     }
 
+    // --- Circular avatar shell (same pattern as CurrentUserAvatar) ---
     Widget shell(Widget child) {
       final content = Container(
         height: size,
@@ -76,6 +81,7 @@ class UserAvatarByUid extends StatelessWidget {
         child: ClipOval(child: child),
       );
       if (onTap == null) return content;
+      // InkWell handles tap — often Navigator.push to ProfileScreen.
       return InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
@@ -97,6 +103,7 @@ class UserAvatarByUid extends StatelessWidget {
     }
 
     return wrapHero(
+      // StreamBuilder reads another user's profile fields (including profileImageBase64).
       StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
         builder: (context, snap) {

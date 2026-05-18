@@ -29,6 +29,11 @@ class FavoriteRecipesService {
     });
   }
 
+  /// Live count of recipes the user hearted (same source as My Recipes → Favorites).
+  Stream<int> streamFavoriteRecipesCount(String userId) {
+    return _favoritesRef(userId).snapshots().map((snapshot) => snapshot.docs.length);
+  }
+
   Future<void> saveFavoriteRecipe({
     required String userId,
     required RecipeMatch recipe,
@@ -52,6 +57,7 @@ class FavoriteRecipesService {
       'instructions': recipe.instructions,
       'savedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+    await _syncFavoriteRecipesCount(userId);
   }
 
   Future<void> removeFavoriteRecipe({
@@ -60,6 +66,14 @@ class FavoriteRecipesService {
   }) async {
     if (recipeId <= 0) return;
     await _favoritesRef(userId).doc('$recipeId').delete();
+    await _syncFavoriteRecipesCount(userId);
+  }
+
+  Future<void> _syncFavoriteRecipesCount(String userId) async {
+    final snapshot = await _favoritesRef(userId).get();
+    await _firestore.collection('users').doc(userId).set({
+      'favoriteRecipesCount': snapshot.docs.length,
+    }, SetOptions(merge: true));
   }
 
   int? _parseRecipeId(dynamic value) {

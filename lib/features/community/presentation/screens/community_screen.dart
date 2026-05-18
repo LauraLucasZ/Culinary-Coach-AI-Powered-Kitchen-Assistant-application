@@ -1,3 +1,6 @@
+// Main Community tab — feed, stories row, suggested users, and header actions.
+// StatefulWidget rebuilds when setState runs; StreamBuilders listen to Firestore for live data.
+
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
 import 'package:culinary_coach_app/features/community/presentation/screens/create_post_screen.dart';
@@ -17,19 +20,23 @@ import 'dart:math' as math;
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key, required this.isDarkMode});
 
+  // Passed from app shell — toggles background, cards, and text colors on this screen.
   final bool isDarkMode;
 
   @override
   State<CommunityScreen> createState() => _CommunityScreenState();
 }
 
+// StatefulWidget State: holds _isNavigating and calls setState when navigation starts/ends.
 class _CommunityScreenState extends State<CommunityScreen> {
   bool _isNavigating = false;
 
+  // One navigation at a time (avoids opening search/notifications twice on double-tap).
   Future<void> _safePush(Widget page) async {
     if (_isNavigating) return;
     setState(() => _isNavigating = true);
     try {
+      // Navigator.push opens another screen (search, notifications, create post, settings).
       await Navigator.of(context).push(
         MaterialPageRoute<void>(builder: (_) => page),
       );
@@ -43,13 +50,18 @@ class _CommunityScreenState extends State<CommunityScreen> {
     final repo = CommunityRepository();
     final currentUser = FirebaseAuth.instance.currentUser;
 
+    // --- Dark mode color handling (from parent tab, not system theme) ---
     final isDarkMode = widget.isDarkMode;
 
+    // Scaffold = full-screen page; body is a Column (header + scrollable feed).
     return Scaffold(
+      // Page background follows light vs dark theme.
       backgroundColor:
           isDarkMode ? const Color(0xFF121212) : AppColors.background,
+      // Column stacks header on top, Expanded feed below (vertical widget tree).
       body: Column(
         children: [
+          // --- Community header section (search, notifications, avatar) ---
           _CommunityHeader(
             isDarkMode: isDarkMode,
             onSearch:
@@ -64,6 +76,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 ? null
                 : () => _safePush(const SettingsScreen()),
           ),
+          // Expanded lets the feed take all space under the header.
           Expanded(
             child: currentUser == null
                 ? _CommunityEmptyState(
@@ -73,6 +86,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         'Create posts, follow people, and share your cooking journey.',
                   )
                 : StreamBuilder<List<String>>(
+                    // --- Firestore following list stream ---
+                    // Rebuilds when users/{uid}/following subcollection changes.
                     stream: repo.watchFollowingUids(currentUser.uid),
                     builder: (context, followSnap) {
                       if (followSnap.hasError) {
@@ -96,6 +111,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       final following = followSnap.data ?? const <String>[];
                       final hasFollowing = following.isNotEmpty;
 
+                      // ListView scrolls suggested users, stories, composer, and feed posts.
                       return ListView(
                         padding: const EdgeInsets.fromLTRB(18, 14, 18, 24),
                         children: [
@@ -105,6 +121,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                             repo: repo,
                           ),
                           const SizedBox(height: 14),
+                          // --- Stories strip (24h stories, real-time rings) ---
                           CommunityStoriesStrip(
                             viewerUid: currentUser.uid,
                             repo: repo,
@@ -139,6 +156,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               title: 'Your feed is empty',
                               subtitle: 'Follow users to see their posts here.',
                             ),
+                          // --- Real-time Firestore posts stream (feed) ---
                           StreamBuilder(
                             stream: repo.watchFeedPosts(includeMyPosts: true),
                             builder: (context, snapshot) {
@@ -177,6 +195,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                   ),
                                 );
                               }
+                              // Nested ListView: shrinkWrap fits inside parent ListView without double scroll.
                               return ListView.separated(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
@@ -199,6 +218,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 }
 
+// Tappable “What’s on your mind?” row — opens the create-post screen.
 class _CreatePostComposerCard extends StatelessWidget {
   const _CreatePostComposerCard({
     required this.isDarkMode,
@@ -210,6 +230,7 @@ class _CreatePostComposerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // --- Dark mode color handling for composer card ---
     final cardColor =
         isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
     final borderColor =
@@ -217,6 +238,7 @@ class _CreatePostComposerCard extends StatelessWidget {
     final hintColor =
         isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
 
+    // InkWell: entire card is tappable → Navigator to CreatePostScreen.
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -292,7 +314,9 @@ class _CreatePostComposerCard extends StatelessWidget {
   }
 }
 
+// Top hero: greeting, avatar, notifications badge, shortcuts to search / post / settings.
 class _CommunityHeader extends StatelessWidget {
+  // StatelessWidget header — colors come from isDarkMode passed from CommunityScreen.
   const _CommunityHeader({
     required this.isDarkMode,
     required this.onSearch,
@@ -309,11 +333,13 @@ class _CommunityHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // build() runs again after setState — whole widget tree under Scaffold is rebuilt.
     final currentUser = FirebaseAuth.instance.currentUser;
     final repo = CommunityRepository();
     final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
     final isCompact = isLandscape;
     final heroTitleSize = isCompact ? 16.0 : 23.0;
+    // Header gradient and control colors switch with dark mode.
     final heroGradient = isDarkMode
         ? const [Color(0xFF1A1A1A), Color(0xFF2D2D2D), Color(0xFF3D3D3D)]
         : const [Color(0xFFCC7705), Color(0xFFDD8E1E), Color(0xFFF0A73A)];
@@ -384,6 +410,7 @@ class _CommunityHeader extends StatelessWidget {
               ],
             )
           else
+            // Load first name from Firestore users/{uid} for the header greeting.
             StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
                   .collection('users')
@@ -401,6 +428,7 @@ class _CommunityHeader extends StatelessWidget {
                 return Row(
                   children: [
                     GestureDetector(
+                      // Avatar tap → own profile screen.
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
@@ -491,6 +519,7 @@ class _CommunityHeader extends StatelessWidget {
             ),
           ],
           SizedBox(height: isCompact ? 8 : 25),
+          // Tapping the search bar navigates to UserSearchScreen.
           InkWell(
             onTap: onSearch,
             borderRadius: BorderRadius.circular(27),
@@ -549,6 +578,7 @@ class _CommunityHeader extends StatelessWidget {
   }
 }
 
+// Round icon button in the header; optional red dot from unread notification count.
 class _CircleHeaderButton extends StatelessWidget {
   const _CircleHeaderButton({
     required this.icon,
@@ -619,6 +649,7 @@ class _CircleHeaderButton extends StatelessWidget {
   }
 }
 
+// Decorative arcs behind the Community hero (no interaction).
 class _CommunityHeroBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -645,6 +676,7 @@ class _CommunityHeroBackgroundPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+// Full-screen message when the user is not signed in.
 class _CommunityEmptyState extends StatelessWidget {
   const _CommunityEmptyState({
     required this.isDarkMode,
@@ -726,6 +758,7 @@ class _CommunityEmptyState extends StatelessWidget {
   }
 }
 
+// Small in-feed hint (empty feed, no posts, errors).
 class _InlineEmptyHint extends StatelessWidget {
   const _InlineEmptyHint({
     required this.isDarkMode,
@@ -780,6 +813,7 @@ class _InlineEmptyHint extends StatelessWidget {
   }
 }
 
+// Horizontal list of users to follow (from Firestore suggestions).
 class _SuggestedUsersSection extends StatelessWidget {
   const _SuggestedUsersSection({
     required this.isDarkMode,
@@ -793,6 +827,7 @@ class _SuggestedUsersSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Firestore users query — suggestions refresh when repo stream emits.
     return StreamBuilder(
       stream: repo.watchSuggestedUsers(excludeUid: viewerUid, limit: 10),
       builder: (context, snapshot) {
@@ -844,6 +879,7 @@ class _SuggestedUsersSection extends StatelessWidget {
   }
 }
 
+// One suggested user card: avatar, follow button, tap opens their profile.
 class _SuggestedUserTile extends StatelessWidget {
   const _SuggestedUserTile({
     required this.isDarkMode,
@@ -876,6 +912,7 @@ class _SuggestedUserTile extends StatelessWidget {
         isDarkMode ? const Color(0xFF1E1E1E) : AppColors.surfaceMuted;
     return InkWell(
       onTap: () {
+        // Open another user’s public profile.
         Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => ProfileScreen(userId: userId),
@@ -940,6 +977,7 @@ class _SuggestedUserTile extends StatelessWidget {
                 final following = snap.data ?? false;
                 return InkWell(
                   onTap: () async {
+                    // Toggle follow in Firestore (following + followers subcollections).
                     if (following) {
                       await repo.unfollowUser(targetUid: userId);
                     } else {

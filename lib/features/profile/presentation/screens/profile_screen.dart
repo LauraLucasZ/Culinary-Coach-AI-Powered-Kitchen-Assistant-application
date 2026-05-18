@@ -1,3 +1,6 @@
+// Profile for the logged-in user, or someone else when userId is passed in.
+// Mix of FutureBuilder (user doc), StreamBuilders (posts/follow), and Firestore avatar upload.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/features/auth/presentation/controllers/auth_controller.dart';
@@ -7,6 +10,7 @@ import 'package:culinary_coach_app/core/widgets/current_user_avatar.dart';
 import 'package:culinary_coach_app/core/widgets/app_default_user_avatar.dart';
 import 'package:culinary_coach_app/features/community/data/models/community_post.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
+import 'package:culinary_coach_app/features/home/data/services/favorite_recipes_service.dart';
 import 'package:culinary_coach_app/features/community/presentation/widgets/community_post_card.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:culinary_coach_app/core/utils/profile_image_base64.dart';
@@ -29,6 +33,7 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
+// StatefulWidget State: local avatar preview, upload flag, reload token for FutureBuilder.
 class _ProfileScreenState extends State<ProfileScreen> {
   final _authController = AuthController();
   int _reloadToken = 0;
@@ -36,6 +41,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _localAvatarPath;
   bool _isAvatarUploading = false;
 
+  // Pick a photo, compress to JPEG Base64, save on users/{uid} in Firestore.
+  // --- Profile image upload (async/await + Firestore merge) ---
   Future<void> _onAvatarTap(User currentUser) async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -47,6 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final bytes = await picked.readAsBytes();
     if (!mounted) return;
+    // setState shows local preview bytes on CurrentUserAvatar while upload runs.
     setState(() {
       _localAvatarPath = picked.path;
       _localAvatarBytes = bytes;
@@ -57,6 +65,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final effectiveLocalPath = picked.path;
 
     try {
+      // await: compress image, then write Base64 string to users/{uid} in Firestore.
       final encoded = await encodeProfileImageBytesForFirestore(bytes);
       if (encoded == null || encoded.isEmpty) {
         throw StateError('Could not encode profile image.');
@@ -89,6 +98,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // One-time read of the profile fields stored under users/{uid}.
   Future<Map<String, dynamic>?> _getUserDoc(String uid) async {
     try {
       final doc = await FirebaseFirestore.instance
@@ -107,6 +117,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  // Sign out and return to onboarding login page.
   Future<void> _logout() async {
     await _authController.logout();
     if (!mounted) return;
@@ -118,6 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
+    // pushAndRemoveUntil clears the stack so the user cannot go back while logged out.
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(
         builder: (_) => const OnboardingScreen(initialPage: 4),
@@ -130,9 +142,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
     final targetUid = widget.userId ?? currentUser?.uid;
+    // Own profile vs someone else's — controls edit button, avatar tap, and which sections show.
     final isPrivateView =
         (targetUid != null && currentUser != null && targetUid == currentUser.uid);
 
+    // AnimatedBuilder rebuilds when AuthController notifies (e.g. logout loading).
     return AnimatedBuilder(
       animation: _authController,
       builder: (context, _) {
@@ -153,6 +167,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         }
 
+        // FutureBuilder (one-shot async) loads users/{uid}; unlike StreamBuilder, not live after load.
         return FutureBuilder<Map<String, dynamic>?>(
           future: _getUserDoc(targetUid),
           key: ValueKey('profile-userdoc-$targetUid-$_reloadToken'),
@@ -170,6 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               isAvatarUploading: _isAvatarUploading,
               onAvatarTap: isPrivateView ? () => _onAvatarTap(currentUser) : null,
               onEditProfileTap: () async {
+                // Push edit screen; bump reload token if user saved changes.
                 final result = await Navigator.of(context).push<bool>(
                   MaterialPageRoute<bool>(
                     builder: (_) => EditProfileScreen(
@@ -190,6 +206,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+// Shows up to two recent posts with a link to the full list screen.
+// StreamBuilder on posts collection — UI updates when they add or delete a post.
 class _ProfilePostsSection extends StatelessWidget {
   const _ProfilePostsSection({
     required this.repo,
@@ -208,6 +226,7 @@ class _ProfilePostsSection extends StatelessWidget {
     return _SectionCard(
       title: isPrivateView ? 'My Posts' : 'Posts',
       child: StreamBuilder<List<CommunityPost>>(
+        // Firestore query: all posts where authorId == this profile's uid.
         stream: repo.watchPostsForUser(targetUid),
         builder: (context, snap) {
           final posts = snap.data ?? const [];
@@ -305,6 +324,7 @@ class _ProfilePostsSection extends StatelessWidget {
   }
 }
 
+// Main profile layout: hero, stats, preferences, posts, and action buttons.
 class _ProfileScaffold extends StatelessWidget {
   const _ProfileScaffold({
     required this.authController,
@@ -348,6 +368,7 @@ class _ProfileScaffold extends StatelessWidget {
     }();
     final otherProfileUid =
         isPrivateView ? '' : ((targetUid ?? '').trim());
+    // Avatar for other users: URL and/or Base64 stored on their Firestore user doc.
     final firestoreImageUrl = (userData?['profileImageUrl'] as String?)?.trim();
     final firestoreImageBase64 =
         readProfileImageBase64(userData);
@@ -379,11 +400,12 @@ class _ProfileScaffold extends StatelessWidget {
 
     final memberSinceText = _formatMemberSince(user?.metadata.creationTime);
 
-    final statsFavorites = _readInt(userData, keys: [
+    final statsFavoritesFallback = _readInt(userData, keys: [
       'favoriteRecipesCount',
       'savedRecipes',
       'savedCount',
     ]);
+    final favoriteRecipesService = FavoriteRecipesService();
     final statsMyRecipes = _readInt(userData, keys: ['myRecipes', 'recipesCount']);
     final statsPosts =
         _readInt(userData, keys: ['communityPosts', 'postsCount']);
@@ -393,6 +415,7 @@ class _ProfileScaffold extends StatelessWidget {
     final likesCount = _readInt(userData, keys: ['likesCount']) ?? 0;
 
     final repo = CommunityRepository();
+    // --- Dark mode color handling (system Theme, unlike Community tab flag) ---
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final pageBg =
         isDarkMode ? const Color(0xFF121212) : AppColors.background;
@@ -403,6 +426,7 @@ class _ProfileScaffold extends StatelessWidget {
         ? const Color(0xFF444444)
         : const Color(0xFFD28E18);
 
+    // Scaffold with SingleChildScrollView so long profile content scrolls vertically.
     return Scaffold(
       backgroundColor: pageBg,
       body: Stack(
@@ -414,6 +438,7 @@ class _ProfileScaffold extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(0, 0, 0, 24),
             child: Column(
               children: [
+                // --- Profile hero section (avatar, name, follow button) ---
                 Container(
                   width: double.infinity,
                   padding: EdgeInsets.fromLTRB(18, topInset + 10, 18, 18),
@@ -439,6 +464,7 @@ class _ProfileScaffold extends StatelessWidget {
                             isDarkMode: isDarkMode,
                           ),
                           const Spacer(),
+                          // On another user's profile: Follow/Unfollow tied to Firestore following doc.
                           if (!isPrivateView &&
                               viewerUid != null &&
                               targetUid != null &&
@@ -473,6 +499,7 @@ class _ProfileScaffold extends StatelessWidget {
                       const SizedBox(height: 14),
                       Row(
                         children: [
+                          // Own profile: CurrentUserAvatar + tap to pick/upload Base64 photo.
                           isPrivateView
                               ? CurrentUserAvatar(
                                   size: 62,
@@ -610,8 +637,36 @@ class _ProfileScaffold extends StatelessWidget {
                           items: [
                             _InlineStatItem(
                               icon: Icons.star_rounded,
-                              value: _formatCount(statsFavorites),
+                              value: _formatCount(statsFavoritesFallback),
                               label: 'Favorites',
+                              valueBuilder: targetUid == null
+                                  ? null
+                                  : (context) {
+                                      final valueColor = isDarkMode
+                                          ? const Color(0xFFF2F2F2)
+                                          : AppColors.textPrimary;
+                                      return StreamBuilder<int>(
+                                        stream: favoriteRecipesService
+                                            .streamFavoriteRecipesCount(
+                                          targetUid!,
+                                        ),
+                                        builder: (context, snapshot) {
+                                          final count = snapshot.hasData
+                                              ? snapshot.data!
+                                              : (statsFavoritesFallback ?? 0);
+                                          return Text(
+                                            count.toString(),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w900,
+                                                  color: valueColor,
+                                                ),
+                                          );
+                                        },
+                                      );
+                                    },
                             ),
                             _InlineStatItem(
                               icon: Icons.restaurant_menu_rounded,
@@ -752,6 +807,7 @@ class _ProfileScaffold extends StatelessWidget {
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(14),
                                 onTap: () {
+                                  // Navigate to list of your past stories.
                                   Navigator.of(context).push(
                                     MaterialPageRoute<void>(
                                       builder: (_) => const StoriesArchiveScreen(),
@@ -968,6 +1024,7 @@ class _ProfileScaffold extends StatelessWidget {
 
 }
 
+// Back button in the profile hero (styled for light/dark).
 class _CircleIconButton extends StatelessWidget {
   const _CircleIconButton({
     required this.icon,
@@ -1008,6 +1065,7 @@ class _CircleIconButton extends StatelessWidget {
   }
 }
 
+// Follow / Unfollow on someone else’s profile header.
 class _HeaderActionButton extends StatelessWidget {
   const _HeaderActionButton({
     required this.label,
@@ -1096,6 +1154,7 @@ class _BadgePill extends StatelessWidget {
   }
 }
 
+// White/dark card wrapper for a titled section (Social, Cooking prefs, etc.).
 class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.title, required this.child});
 
@@ -1150,12 +1209,14 @@ class _InlineStatItem {
     required this.value,
     required this.label,
     this.onTap,
+    this.valueBuilder,
   });
 
   final IconData icon;
   final String value;
   final String label;
   final VoidCallback? onTap;
+  final WidgetBuilder? valueBuilder;
 }
 
 class _InlineStatsRow extends StatelessWidget {
@@ -1222,13 +1283,16 @@ class _InlineStatsItemView extends StatelessWidget {
           child: Icon(item.icon, color: AppColors.primaryDeep, size: 18),
         ),
         const SizedBox(height: 8),
-        Text(
-          item.value,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w900,
-                color: valueColor,
-              ),
-        ),
+        if (item.valueBuilder != null)
+          item.valueBuilder!(context)
+        else
+          Text(
+            item.value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: valueColor,
+                ),
+          ),
         const SizedBox(height: 2),
         Text(
           item.label,
@@ -1397,6 +1461,7 @@ class _RowIcon extends StatelessWidget {
   }
 }
 
+// Tappable row (Edit profile, Change password, Settings, Stories archive).
 class _ActionRow extends StatelessWidget {
   const _ActionRow({
     required this.icon,

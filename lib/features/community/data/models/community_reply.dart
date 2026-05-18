@@ -1,5 +1,9 @@
+// Reply nested under a comment — saved as part of the comment document in Firestore.
+// toFirestore() builds the map written when someone replies in the comments sheet.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// Reply nested inside a comment’s replies array on the post document.
 class CommunityReply {
   const CommunityReply({
     required this.id,

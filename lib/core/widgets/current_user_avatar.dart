@@ -1,3 +1,6 @@
+// Logged-in user's round avatar. StreamBuilder on users/{uid} updates when Firestore changes.
+// Used on Community header and create-post; InkWell handles tap when onTap is set.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/core/utils/profile_image_base64.dart';
 import 'package:culinary_coach_app/core/widgets/profile_avatar_image.dart';
@@ -5,6 +8,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 
+// StatelessWidget — UI rebuilds when StreamBuilder receives new Firestore data.
 class CurrentUserAvatar extends StatelessWidget {
   const CurrentUserAvatar({
     super.key,
@@ -40,7 +44,9 @@ class CurrentUserAvatar extends StatelessWidget {
     final effectiveBorder =
         borderColor ?? Colors.white.withValues(alpha: 0.65);
 
+    // --- Avatar shell (circle frame + optional loading overlay) ---
     Widget buildShell({required Widget child}) {
+      // Container + ClipOval draws the round frame; ProfileAvatarImage fills the inside.
       final content = Container(
         height: size,
         width: size,
@@ -52,6 +58,7 @@ class CurrentUserAvatar extends StatelessWidget {
         child: ClipOval(child: child),
       );
 
+      // Stack layers the spinner on top of the avatar during async upload.
       final withOverlay = Stack(
         alignment: Alignment.center,
         children: [
@@ -77,6 +84,7 @@ class CurrentUserAvatar extends StatelessWidget {
       );
 
       if (onTap == null) return withOverlay;
+      // InkWell gives a tap ripple when the user opens profile or changes photo.
       return InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
@@ -84,6 +92,7 @@ class CurrentUserAvatar extends StatelessWidget {
       );
     }
 
+    // --- Profile image source priority (passed into ProfileAvatarImage) ---
     Widget avatarContent({
       required String? profileImageBase64,
       required String? localPath,
@@ -108,6 +117,7 @@ class CurrentUserAvatar extends StatelessWidget {
       );
     }
 
+    // Not signed in: show fallback avatar without Firestore stream.
     if (user == null) {
       return buildShell(
         child: avatarContent(
@@ -118,6 +128,7 @@ class CurrentUserAvatar extends StatelessWidget {
       );
     }
 
+    // StreamBuilder listens to Firestore users/{uid} so the avatar updates when data changes.
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('users')

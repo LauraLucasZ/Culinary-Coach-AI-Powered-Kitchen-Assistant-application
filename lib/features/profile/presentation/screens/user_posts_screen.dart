@@ -1,3 +1,6 @@
+// All community posts by one user — opened from Profile "View more posts".
+// StreamBuilder on posts where authorId matches; ListView of CommunityPostCard widgets.
+
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
 import 'package:culinary_coach_app/features/community/presentation/widgets/community_post_card.dart';
@@ -24,16 +27,19 @@ class UserPostsScreen extends StatelessWidget {
     return "$hint's Posts";
   }
 
+  // StatelessWidget: this screen has no local state; StreamBuilder drives rebuilds.
   @override
   Widget build(BuildContext context) {
     final repo = CommunityRepository();
 
+    // Scaffold = page shell (AppBar + body widget tree).
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
+        // Navigator.maybePop returns to ProfileScreen without crashing if stack is empty.
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).maybePop(),
@@ -47,15 +53,19 @@ class UserPostsScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
+      // --- Real-time Firestore posts stream ---
+      // StreamBuilder rebuilds whenever posts in Firestore change for this authorId.
       body: StreamBuilder(
         stream: repo.watchPostsForUser(targetUid),
         builder: (context, snap) {
           final posts = snap.data ?? const [];
+          // Waiting state: show spinner until first snapshot arrives.
           if (snap.connectionState == ConnectionState.waiting && posts.isEmpty) {
             return const Center(
               child: CircularProgressIndicator(color: AppColors.primaryDeep),
             );
           }
+          // Empty state: Column centers icon + message vertically.
           if (posts.isEmpty) {
             return Center(
               child: Padding(
@@ -82,6 +92,7 @@ class UserPostsScreen extends StatelessWidget {
               ),
             );
           }
+          // ListView builds scrollable post cards (reuses CommunityPostCard widget).
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
             itemCount: posts.length,

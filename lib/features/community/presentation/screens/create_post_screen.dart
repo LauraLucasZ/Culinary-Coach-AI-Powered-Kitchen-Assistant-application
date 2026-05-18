@@ -1,3 +1,6 @@
+// Create a new community post — caption plus optional photos from the gallery.
+// StatefulWidget + setState; CommunityRepository.createPost writes to Firestore posts.
+
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -19,6 +22,7 @@ class _LocalPickedImage {
   final Uint8List previewBytes;
 }
 
+// Compose a new post: caption, optional photos, then save via CommunityRepository.
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
 
@@ -27,6 +31,7 @@ class CreatePostScreen extends StatefulWidget {
 }
 
 class _CreatePostScreenState extends State<CreatePostScreen> {
+  // StatefulWidget: setState refreshes the Post button when caption/images change.
   final _captionController = TextEditingController();
   final _captionScrollController = ScrollController();
   final _picker = ImagePicker();
@@ -154,6 +159,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     setState(() => _images.removeAt(index));
   }
 
+  // Encode images to Base64 and call repo.createPost (writes to Firestore posts).
   Future<void> _submit() async {
     if (_submitting || !_canSubmit) return;
 
@@ -195,6 +201,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   @override
+  // Scaffold + Column: caption field, image previews, Post button (StatefulWidget build).
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {

@@ -1,3 +1,6 @@
+// All your past stories (including expired) — opened from Profile → Stories Archive.
+// StreamBuilder loads from Firestore; thumbnails decode Base64 to show preview images.
+
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -8,9 +11,11 @@ import 'package:culinary_coach_app/features/community/presentation/screens/story
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+// Profile screen: grid of your past stories (opened from profile actions).
 class StoriesArchiveScreen extends StatelessWidget {
   const StoriesArchiveScreen({super.key});
 
+  // Decode story thumbnail Base64 from Firestore for the list preview image.
   Uint8List? _thumb(String raw) {
     try {
       final b = base64Decode(raw.trim());
@@ -60,6 +65,7 @@ class StoriesArchiveScreen extends StatelessWidget {
         backgroundColor: AppColors.background,
       ),
       body: StreamBuilder<List<CommunityStory>>(
+        // Archived/expired stories for the signed-in user from Firestore.
         stream: repo.watchMyStoriesArchive(user.uid),
         builder: (context, snap) {
           if (snap.hasError) {
@@ -100,6 +106,7 @@ class StoriesArchiveScreen extends StatelessWidget {
             );
           }
 
+          // ListView of archived stories; thumb uses Base64 decode → MemoryImage in Row.
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
             itemCount: items.length,
@@ -113,6 +120,7 @@ class StoriesArchiveScreen extends StatelessWidget {
                 child: InkWell(
                   borderRadius: BorderRadius.circular(18),
                   onTap: () {
+                    // Navigator opens full-screen StoryViewerScreen for this story.
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => StoryViewerScreen(

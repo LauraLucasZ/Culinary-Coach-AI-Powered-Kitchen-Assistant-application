@@ -1,9 +1,13 @@
+// List of follow/like/comment notifications for the current user.
+// StreamBuilder on Firestore notifications subcollection; tap row opens profile.
+
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/core/widgets/app_default_user_avatar.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
 import 'package:culinary_coach_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:flutter/material.dart';
 
+// Lists follow/like/comment alerts; tapping opens the sender’s profile.
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -11,6 +15,7 @@ class NotificationsScreen extends StatefulWidget {
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
+// StatefulWidget: runs mark-all-read once when screen opens (didChangeDependencies).
 class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _marked = false;
 
@@ -19,7 +24,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     super.didChangeDependencies();
     if (_marked) return;
     _marked = true;
-    // Mark as read when page opens.
+    // One-time when screen opens — marks notifications read in Firestore.
     CommunityRepository().markAllNotificationsRead();
   }
 
@@ -30,6 +35,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Notifications')),
       body: StreamBuilder(
+        // Live notifications for the signed-in user from Firestore.
         stream: repo.watchNotifications(),
         builder: (context, snapshot) {
           final items = snapshot.data ?? const [];
@@ -54,12 +60,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ),
             );
           }
+          // ListView builds one row per notification document from Firestore.
           return ListView.separated(
             padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
             itemCount: items.length,
             separatorBuilder: (context, index) => const SizedBox(height: 10),
             itemBuilder: (context, i) {
               final n = items[i];
+              // InkWell: tap row → Navigator opens that user's ProfileScreen.
               return InkWell(
                 onTap: () async {
                   if (n.fromUid.trim().isEmpty) return;

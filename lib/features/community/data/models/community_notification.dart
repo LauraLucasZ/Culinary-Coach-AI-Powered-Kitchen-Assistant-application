@@ -1,5 +1,9 @@
+// In-app notification (follow, like, comment) stored under users/{uid}/notifications.
+// NotificationsScreen lists these via StreamBuilder.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// One notification in users/{uid}/notifications (follow, like, comment, etc.).
 class CommunityNotification {
   const CommunityNotification({
     required this.id,
@@ -29,6 +33,7 @@ class CommunityNotification {
   final String? recipientUserId;
   final String? senderUserId;
 
+  // Build notification model from users/{uid}/notifications/{id} snapshot.
   static CommunityNotification fromDoc(
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {

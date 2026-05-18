@@ -1,4 +1,7 @@
 import 'dart:convert';
+// Single post in the feed — author, text, images, like/comment/repost buttons.
+// StreamBuilder updates like heart when Firestore likedBy changes; tap opens comments sheet.
+
 import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -13,6 +16,7 @@ import 'package:culinary_coach_app/features/profile/presentation/screens/profile
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+// One feed post: author, caption, images, like / comment / repost actions.
 class CommunityPostCard extends StatelessWidget {
   const CommunityPostCard({required this.post, super.key});
 
@@ -22,6 +26,7 @@ class CommunityPostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final repo = CommunityRepository();
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    // Card colors follow system dark mode (not the Community tab’s isDarkMode flag).
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final cardColor =
         isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
@@ -30,6 +35,7 @@ class CommunityPostCard extends StatelessWidget {
     final bodyTextColor =
         isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
 
+    // Container wraps the card; Column stacks header, text, images, and action Row.
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       decoration: BoxDecoration(
@@ -106,6 +112,7 @@ class CommunityPostCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 12),
+          // --- Post actions row (like, comment, repost) ---
           Row(
             children: [
               Expanded(
@@ -116,6 +123,7 @@ class CommunityPostCard extends StatelessWidget {
                         onTap: null,
                       )
                     : StreamBuilder<bool>(
+                        // Firestore likedBy array — UI updates when like toggles.
                         stream:
                             repo.watchHasLiked(postId: post.id, uid: currentUid),
                         builder: (context, snap) {
@@ -137,6 +145,7 @@ class CommunityPostCard extends StatelessWidget {
                 child: _ActionPill(
                   icon: Icons.mode_comment_outlined,
                   label: _formatCount(post.commentCount),
+                  // Opens comments bottom sheet (modal route, not full Navigator page).
                   onTap: () => CommentsSheet.show(
                     context,
                     postId: post.id,
@@ -164,6 +173,7 @@ class CommunityPostCard extends StatelessWidget {
   static String _formatCount(int v) => v.toString();
 }
 
+// Shows latest comment + reply under the post before opening the full sheet.
 class _PostCommentPreview extends StatelessWidget {
   const _PostCommentPreview({required this.post});
 
@@ -174,6 +184,7 @@ class _PostCommentPreview extends StatelessWidget {
     if (post.commentCount <= 0) return const SizedBox.shrink();
 
     final repo = CommunityRepository();
+    // StreamBuilder loads latest comment preview from posts/{id}/comments.
     return StreamBuilder<List<CommunityComment>>(
       stream: repo.watchCommentPreviewForPost(post.id),
       builder: (context, snap) {
@@ -349,6 +360,7 @@ class _PreviewReplyLine extends StatelessWidget {
   }
 }
 
+// Author avatar, name, time; tap navigates to ProfileScreen.
 class _HeaderRow extends StatelessWidget {
   const _HeaderRow({
     required this.authorId,
@@ -366,6 +378,7 @@ class _HeaderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Post cards use system theme here (not Community tab's isDarkMode flag).
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final titleColor =
         isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
@@ -474,6 +487,7 @@ class _MetaChip extends StatelessWidget {
   }
 }
 
+// Like / comment / repost button — InkWell disabled when onTap is null (logged out).
 class _ActionPill extends StatelessWidget {
   const _ActionPill({
     required this.icon,
@@ -564,6 +578,7 @@ class _RepostPill extends StatelessWidget {
   }
 }
 
+// Post images in Firestore are Base64 strings — decode to bytes for MemoryImage.
 Uint8List? _tryDecodeBase64PostImage(String raw) {
   try {
     return base64Decode(raw);
@@ -572,6 +587,7 @@ Uint8List? _tryDecodeBase64PostImage(String raw) {
   }
 }
 
+// Shows post images from network URLs and/or Base64 stored in Firestore.
 class _PostMediaGallery extends StatelessWidget {
   const _PostMediaGallery({
     required this.networkUrls,

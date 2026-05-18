@@ -1,6 +1,10 @@
+// One comment on a post (Firestore subcollection posts/{postId}/comments).
+// Can include nested replies array parsed in fromDoc.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/features/community/data/models/community_reply.dart';
 
+// Top-level comment on a post (stored under posts/{id}/comments).
 class CommunityComment {
   const CommunityComment({
     required this.id,
@@ -27,6 +31,7 @@ class CommunityComment {
   bool isLikedBy(String? viewerUid) =>
       viewerUid != null && viewerUid.isNotEmpty && likedBy.contains(viewerUid);
 
+  // Maps Firestore comment document → CommunityComment for ListView rows.
   static CommunityComment fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? const <String, dynamic>{};
     final createdAtRaw = data['createdAt'];

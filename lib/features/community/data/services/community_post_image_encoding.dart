@@ -1,3 +1,6 @@
+// Turns gallery picks into compressed JPEG Base64 strings for post documents.
+// Firestore has a size limit per doc, so we shrink images before upload.
+
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -10,6 +13,7 @@ Future<List<String>> encodeCommunityPostImagesForFirestore(
   List<XFile> files,
 ) async {
   final out = <String>[];
+  // Each picked image: read bytes → compress JPEG → Base64 string for Firestore post doc.
   for (final f in files) {
     final raw = await f.readAsBytes();
     if (raw.isEmpty) continue;

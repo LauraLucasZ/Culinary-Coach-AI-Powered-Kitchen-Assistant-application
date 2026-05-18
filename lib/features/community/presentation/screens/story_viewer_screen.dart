@@ -1,3 +1,6 @@
+// Full-screen story viewer — swipe/tap between stories, auto-advance timer.
+// Shows image from story.imageBase64 using decode + Image.memory (MemoryImage).
+
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -30,6 +33,7 @@ class StoryViewerScreen extends StatefulWidget {
   State<StoryViewerScreen> createState() => _StoryViewerScreenState();
 }
 
+// StatefulWidget drives PageView page changes and progress animation with setState.
 class _StoryViewerScreenState extends State<StoryViewerScreen>
     with TickerProviderStateMixin {
   static const Duration _kStoryDuration = Duration(seconds: 5);
@@ -48,6 +52,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
     final n = widget.stories.length;
     final safe = n == 0 ? 0 : widget.initialIndex.clamp(0, n - 1);
     _currentIndex = safe;
+    // PageController swipes between stories; AnimationController drives progress bar timing.
     _pageController = PageController(initialPage: safe);
     _progress = AnimationController(vsync: this, duration: _kStoryDuration)
       ..addStatusListener(_onProgressStatus);
@@ -148,6 +153,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen>
         fit: StackFit.expand,
         alignment: AlignmentDirectional.topStart,
         children: [
+          // PageView swipes between stories; each page loads story image from Base64.
           PageView.builder(
             controller: _pageController,
             onPageChanged: _onPageChanged,

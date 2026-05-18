@@ -1,8 +1,12 @@
+// Change password for email/password accounts (Firebase Auth, not Firestore).
+// Reauthenticate with current password, then call updatePassword.
+
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 
+// Lets email/password users change password via Firebase Auth reauthentication.
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
 
@@ -11,6 +15,7 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
+  // StatefulWidget: setState toggles loading spinner and password visibility icons.
   final _currentController = TextEditingController();
   final _newController = TextEditingController();
   final _confirmController = TextEditingController();
@@ -36,6 +41,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return user.providerData.any((p) => p.providerId == 'password');
   }
 
+  // Reauth with current password, then updatePassword on Firebase Auth.
   Future<void> _submit() async {
     final user = FirebaseAuth.instance.currentUser;
     final email = (user?.email ?? '').trim();
@@ -76,6 +82,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     setState(() => _isLoading = true);
     try {
+      // async/await: reauthenticate, then Firebase Auth updatePassword (not Firestore).
       final credential = EmailAuthProvider.credential(
         email: email,
         password: current,
@@ -96,6 +103,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password updated successfully.')),
       );
+      // Success: pop back to ProfileScreen.
       Navigator.of(context).pop();
     } on FirebaseAuthException catch (e) {
       debugPrint('Change password failed: ${e.code} - ${e.message}');

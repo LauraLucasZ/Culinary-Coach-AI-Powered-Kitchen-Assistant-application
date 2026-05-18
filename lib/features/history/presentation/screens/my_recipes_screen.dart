@@ -3,6 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/core/widgets/current_user_avatar.dart';
 import 'package:culinary_coach_app/features/home/data/models/recipe_match.dart';
+import 'package:culinary_coach_app/features/home/data/services/favorite_recipes_service.dart';
 import 'package:culinary_coach_app/features/home/presentation/screens/recipe_details_screen.dart';
 import 'package:culinary_coach_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:culinary_coach_app/features/settings/presentation/screens/settings_screen.dart';
@@ -355,7 +356,6 @@ class _FavoritesTab extends StatelessWidget {
           .collection('users')
           .doc(userId)
           .collection('favorite_recipes')
-          .orderBy('savedAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -377,7 +377,16 @@ class _FavoritesTab extends StatelessWidget {
           );
         }
 
-        final recipes = snapshot.data?.docs ?? [];
+        final recipes = List<QueryDocumentSnapshot>.from(
+          snapshot.data?.docs ?? const [],
+        )..sort((a, b) {
+            final aSaved = (a.data() as Map<String, dynamic>)['savedAt'];
+            final bSaved = (b.data() as Map<String, dynamic>)['savedAt'];
+            if (aSaved is Timestamp && bSaved is Timestamp) {
+              return bSaved.compareTo(aSaved);
+            }
+            return 0;
+          });
 
         if (recipes.isEmpty) {
           return Center(
@@ -455,6 +464,8 @@ class _RecipeCard extends StatefulWidget {
 }
 
 class _RecipeCardState extends State<_RecipeCard> {
+  final FavoriteRecipesService _favoriteRecipesService =
+      FavoriteRecipesService();
   bool _isFavorite = false;
   bool _isLoadingFavorite = false;
 
@@ -484,14 +495,11 @@ class _RecipeCardState extends State<_RecipeCard> {
     setState(() => _isLoadingFavorite = true);
 
     try {
-      final favRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .collection('favorite_recipes')
-          .doc(widget.recipeId);
-
       if (_isFavorite) {
-        await favRef.delete();
+        await _favoriteRecipesService.removeFavoriteRecipe(
+          userId: widget.userId,
+          recipeId: widget.recipe.id,
+        );
         setState(() => _isFavorite = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -503,8 +511,10 @@ class _RecipeCardState extends State<_RecipeCard> {
           );
         }
       } else {
-        final favoriteData = widget.recipe.toFirestoreFavorite();
-        await favRef.set(favoriteData);
+        await _favoriteRecipesService.saveFavoriteRecipe(
+          userId: widget.userId,
+          recipe: widget.recipe,
+        );
         setState(() => _isFavorite = true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

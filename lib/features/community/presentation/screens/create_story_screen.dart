@@ -1,3 +1,6 @@
+// Add a story (photo + optional text) that expires in about 24 hours.
+// Image saved as Base64 in Firestore stories collection via createStory().
+
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -12,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+// Pick an image and optional text overlay; uploads a 24h story to Firestore.
 class CreateStoryScreen extends StatefulWidget {
   const CreateStoryScreen({super.key});
 
@@ -20,6 +24,7 @@ class CreateStoryScreen extends StatefulWidget {
 }
 
 class _CreateStoryScreenState extends State<CreateStoryScreen> {
+  // StatefulWidget: preview bytes in state; setState after ImagePicker returns.
   final _overlayController = TextEditingController();
   final _overlayScrollController = ScrollController();
   final _picker = ImagePicker();
@@ -146,6 +151,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     }
   }
 
+  // Upload story image as Base64 to Firestore with 24h expiry via repo.createStory.
   Future<void> _submit() async {
     if (_submitting || !_canSubmit) return;
     final file = _imageFile;

@@ -1,3 +1,6 @@
+// Horizontal stories row on Community — your story plus people you follow.
+// StreamBuilder loads active rings from Firestore; Navigator opens create or viewer screens.
+
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/core/widgets/app_default_user_avatar.dart';
 import 'package:culinary_coach_app/core/widgets/current_user_avatar.dart';
@@ -32,9 +35,11 @@ class CommunityStoriesStrip extends StatelessWidget {
   final CommunityRepository repo;
   final ValueChanged<bool> onBusyChanged;
 
+  // StatelessWidget: child StreamBuilder rebuilds when Firestore stories change.
   @override
   Widget build(BuildContext context) {
     final trimmedViewer = viewerUid.trim();
+    // --- Story avatar rendering (Firestore stream → horizontal ListView) ---
     return StreamBuilder<List<CommunityStoryRing>>(
       stream: repo.watchActiveStoryRings(viewerUid: trimmedViewer),
       builder: (context, snap) {
@@ -66,6 +71,7 @@ class CommunityStoriesStrip extends StatelessWidget {
 
         return SizedBox(
           height: 108,
+          // Horizontal ListView for story circles (Row-like scroll).
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.only(right: 8),
@@ -80,6 +86,7 @@ class CommunityStoriesStrip extends StatelessWidget {
                   child: _PeerStoryRing(
                     ring: r,
                     onTap: () {
+                      // Navigator + async whenComplete: block double-tap while viewer is open.
                       onBusyChanged(true);
                       Navigator.of(context)
                           .push(
@@ -103,6 +110,7 @@ class CommunityStoriesStrip extends StatelessWidget {
   }
 }
 
+// “Your story” circle — create new or replay your active stories.
 class _YourStoryTile extends StatelessWidget {
   const _YourStoryTile({
     required this.ownRing,
@@ -113,6 +121,7 @@ class _YourStoryTile extends StatelessWidget {
   final ValueChanged<bool> onBusyChanged;
 
   Future<void> _openCreate(BuildContext context) async {
+    // Push CreateStoryScreen; parent uses onBusyChanged to avoid double navigation.
     onBusyChanged(true);
     try {
       await Navigator.of(context).push<bool>(
@@ -283,6 +292,7 @@ class _YourStoryTile extends StatelessWidget {
   }
 }
 
+// Another user’s story ring — tap opens StoryViewerScreen for their stories.
 class _PeerStoryRing extends StatelessWidget {
   const _PeerStoryRing({
     required this.ring,

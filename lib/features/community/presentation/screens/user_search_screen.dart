@@ -1,3 +1,6 @@
+// Search users by name, follow/unfollow, open their profile with Navigator.
+// StatefulWidget filters a Firestore user list as you type in the search field.
+
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/core/widgets/app_default_user_avatar.dart';
 import 'package:culinary_coach_app/core/widgets/app_primary_button.dart';
@@ -6,6 +9,7 @@ import 'package:culinary_coach_app/features/profile/presentation/screens/profile
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+// Search users by name; follow/unfollow and open profiles from results.
 class UserSearchScreen extends StatefulWidget {
   const UserSearchScreen({super.key});
 
@@ -14,6 +18,7 @@ class UserSearchScreen extends StatefulWidget {
 }
 
 class _UserSearchScreenState extends State<UserSearchScreen> {
+  // setState on each keystroke updates _query and rebuilds the filtered ListView.
   final _controller = TextEditingController();
   String _query = '';
 
@@ -29,6 +34,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
     final viewerUid = FirebaseAuth.instance.currentUser?.uid;
     final q = _query.trim().toLowerCase();
 
+    // Column: search TextField on top, Expanded StreamBuilder list below.
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Search Users')),
@@ -63,6 +69,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                         border: InputBorder.none,
                         isDense: true,
                       ),
+                      // setState rebuilds list with filtered users as you type.
                       onChanged: (v) => setState(() => _query = v.trim()),
                     ),
                   ),
@@ -80,6 +87,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
           ),
           Expanded(
             child: StreamBuilder(
+              // Load users from Firestore, then filter locally by search text.
               stream: repo.watchAllUsers(limit: 120),
               builder: (context, snapshot) {
                 var users = snapshot.data ?? const [];

@@ -1,5 +1,9 @@
+// User summary from Firestore users collection — name, avatar URL, follower counts.
+// Used in search results and suggested-users row on the Community tab.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// User summary for search, suggestions, and follow lists (mapped from users/{uid}).
 class CommunityUser {
   const CommunityUser({
     required this.uid,
@@ -27,6 +31,7 @@ class CommunityUser {
   final int likesCount;
   final List<String> nameKeywords;
 
+  // fromDoc: reads users/{uid} fields used in search and suggested-user cards.
   static CommunityUser fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? const <String, dynamic>{};
     final uid = (data['uid'] as String?)?.trim();
@@ -82,6 +87,7 @@ class CommunityUser {
     return 'SmartChef User';
   }
 
+  // Picks the first non-empty profile image URL field on the user doc.
   static String? _resolveProfileImageUrl(Map<String, dynamic> data) {
     String? readString(String key) {
       final v = data[key];

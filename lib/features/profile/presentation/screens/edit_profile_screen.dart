@@ -1,9 +1,13 @@
+// Edit name and cooking preferences — saves to Firestore users/{uid} with merge.
+// StatefulWidget form; Navigator.pop(true) tells ProfileScreen to reload user data.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/core/utils/text_keywords.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+// Form to edit name and cooking preferences; saves to Firestore users/{uid}.
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key, this.initialData});
 
@@ -13,6 +17,7 @@ class EditProfileScreen extends StatefulWidget {
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
+// StatefulWidget State: form fields, loading/saving flags updated with setState.
 class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
@@ -44,6 +49,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
+    // async _load fills controllers then setState shows the form.
     _load();
   }
 
@@ -56,6 +62,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
+  // Load existing fields from Firestore (or widget.initialData as fallback).
   Future<void> _load() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -67,6 +74,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     Map<String, dynamic>? resolved = widget.initialData;
     try {
+      // .get() is one fetch; form does not live-update if Firestore changes elsewhere.
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -82,6 +90,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _isLoading = false);
   }
 
+  // Fill form controllers from a Firestore user document map.
   void _hydrateFromData(Map<String, dynamic>? data) {
     final user = FirebaseAuth.instance.currentUser;
 
@@ -118,6 +127,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _allergiesController.text = _allergies == 'None' ? '' : _allergies;
   }
 
+  // Validate and merge updated profile fields into users/{uid}.
   Future<void> _save() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -138,6 +148,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     setState(() => _isSaving = true);
     try {
+      // Merge writes only the fields we send — other user doc fields stay unchanged.
       final equipment = _kitchenEquipmentController.text.trim();
       final allergies = _allergiesController.text.trim();
 
@@ -160,6 +171,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
+      // Firestore merge: update user profile fields without deleting other keys.
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -180,6 +192,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated.')),
       );
+      // pop(true) tells ProfileScreen to reload user doc (FutureBuilder key bump).
       Navigator.of(context).pop(true);
     } catch (_) {
       if (!mounted) return;

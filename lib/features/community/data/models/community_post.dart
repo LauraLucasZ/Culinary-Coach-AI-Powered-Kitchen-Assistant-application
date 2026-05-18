@@ -1,5 +1,9 @@
+// Maps one Firestore posts/{id} document to a Dart object for CommunityPostCard.
+// fromDoc reads fields like caption, imageBase64List, likeCount from the snapshot.
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// One community post document from the posts collection (text, images, counts).
 class CommunityPost {
   const CommunityPost({
     required this.id,
@@ -33,6 +37,7 @@ class CommunityPost {
   /// Network image URLs from Firebase Storage or elsewhere (legacy posts).
   final List<String> imageUrls;
   /// JPEG bytes as Base64, stored in Firestore for new posts (no Storage).
+  /// UI decodes these strings and shows them with Image.memory.
   final List<String> imageBase64List;
   /// MP4 bytes as Base64 (no Storage), optional video attachment.
   final String? videoBase64;
@@ -68,6 +73,7 @@ class CommunityPost {
   int get likesCount => likeCount;
   int get commentsCount => commentCount;
 
+  // fromDoc: converts Firestore snapshot → CommunityPost for widgets like CommunityPostCard.
   static CommunityPost fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? const <String, dynamic>{};
     final createdAtRaw = data['createdAt'];

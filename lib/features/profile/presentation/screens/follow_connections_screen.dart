@@ -1,3 +1,6 @@
+// Shows followers or following list for a user — from Firestore subcollections.
+// StreamBuilder keeps the list in sync when follow relationships change.
+
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/core/widgets/app_default_user_avatar.dart';
 import 'package:culinary_coach_app/core/widgets/app_primary_button.dart';
@@ -39,6 +42,7 @@ class FollowConnectionsScreen extends StatelessWidget {
     final title = followers ? 'Followers' : 'Following';
     final ownerUid = targetUid.trim();
 
+    // Scaffold + AppBar: standard full page with back button (Navigator.maybePop).
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -66,6 +70,7 @@ class FollowConnectionsScreen extends StatelessWidget {
               ),
             )
           : StreamBuilder<List<FollowListEntry>>(
+              // Stream follower or following UIDs from Firestore subcollections.
               stream: repo.watchFollowList(targetUid: ownerUid, followers: followers),
               builder: (context, snap) {
                 if (snap.hasError) {
@@ -104,6 +109,7 @@ class FollowConnectionsScreen extends StatelessWidget {
                     ),
                   );
                 }
+                // ListView: one InkWell row per follower/following entry from Firestore.
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
                   itemCount: list.length,
@@ -128,6 +134,7 @@ class FollowConnectionsScreen extends StatelessWidget {
   }
 }
 
+// StatelessWidget row: avatar, name, follow button; tap opens ProfileScreen.
 class _FollowUserRow extends StatelessWidget {
   const _FollowUserRow({
     required this.entry,
@@ -143,6 +150,7 @@ class _FollowUserRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // InkWell + Navigator: tap user row to view their public profile.
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
@@ -175,6 +183,7 @@ class _FollowUserRow extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
+              // Live user doc for display name/badge on this row.
               child: StreamBuilder<CommunityUser?>(
                 stream: repo.watchUser(rowUid),
                 builder: (context, userSnap) {
@@ -214,6 +223,7 @@ class _FollowUserRow extends StatelessWidget {
                   SizedBox(
                     width: 140,
                     height: 40,
+                    // Follow button label updates when following doc is created/deleted.
                     child: StreamBuilder<bool>(
                       stream: repo.watchIsFollowing(
                         viewerUid: cu,

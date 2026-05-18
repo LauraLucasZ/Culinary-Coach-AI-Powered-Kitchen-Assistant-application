@@ -1,3 +1,6 @@
+// Emoji picker bottom sheet for create-post and create-story text fields.
+// Inserts emoji at the cursor position in the TextEditingController.
+
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +21,7 @@ void showCommunityEmojiPickerSheet(
       borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
     ),
     builder: (sheetContext) {
+      // Column holds close button + EmojiPicker; keyboard inset via viewInsets padding.
       return Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
@@ -40,6 +44,7 @@ void showCommunityEmojiPickerSheet(
                   ),
                 ),
                 Expanded(
+                  // EmojiPicker writes into textController — same field as the post caption.
                   child: EmojiPicker(
                     textEditingController: textController,
                     scrollController: effectiveScroll,

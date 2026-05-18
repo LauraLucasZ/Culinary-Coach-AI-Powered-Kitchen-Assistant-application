@@ -1,3 +1,6 @@
+// Firestore layer for Community: posts, stories, follows, likes, comments, notifications.
+// Screens use Stream/Future methods here; when data changes, StreamBuilder rebuilds the UI.
+
 import 'dart:async';
 import 'dart:developer' as developer;
 
@@ -12,6 +15,7 @@ import 'package:culinary_coach_app/features/community/data/services/community_po
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 
+// One row in a followers/following list (uid + display name + optional avatar URL).
 class FollowListEntry {
   const FollowListEntry({
     required this.uid,
@@ -24,6 +28,7 @@ class FollowListEntry {
   final String? profileImageUrl;
 }
 
+// Central Firestore access for Community: posts, stories, follows, likes, notifications.
 class CommunityRepository {
   CommunityRepository({
     FirebaseFirestore? firestore,
@@ -41,6 +46,8 @@ class CommunityRepository {
     }
     return u;
   }
+
+  // --- Firestore path helpers (users, posts, stories, subcollections) ---
 
   DocumentReference<Map<String, dynamic>> userDoc(String uid) =>
       _firestore.collection('users').doc(uid);
@@ -60,6 +67,9 @@ class CommunityRepository {
   CollectionReference<Map<String, dynamic>> notificationsCol(String uid) =>
       userDoc(uid).collection('notifications');
 
+  // --- Follow graph ---
+
+  // .snapshots() listens to the whole following subcollection — any follow/unfollow triggers the stream.
   Stream<List<String>> watchFollowingUids(String uid) {
     return followingCol(uid).snapshots().transform(
           StreamTransformer<QuerySnapshot<Map<String, dynamic>>, List<String>>.fromHandlers(
@@ -122,6 +132,7 @@ class CommunityRepository {
     return doc.exists;
   }
 
+  // One document: users/{viewer}/following/{target} — exists means "Following" in the UI.
   Stream<bool> watchIsFollowing({
     required String viewerUid,
     required String targetUid,
@@ -130,6 +141,7 @@ class CommunityRepository {
     return followingCol(viewerUid).doc(targetUid).snapshots().map((d) => d.exists);
   }
 
+  // followUser: Firestore transaction updates following, followers, counts, and notification.
   Future<void> followUser({
     required String targetUid,
   }) async {
@@ -228,6 +240,8 @@ class CommunityRepository {
     });
   }
 
+  // --- Posts (create, feed, per-user, likes, comments, reposts) ---
+
   Future<String> createPost({
     required String caption,
     String? recipeTitle,
@@ -312,6 +326,7 @@ class CommunityRepository {
   /// Returns a query for the first "page" of feed posts.
   /// Note: uses whereIn with chunking limit 30 internally by returning multiple queries,
   /// but for simplicity in UI we provide a single "combined stream" method.
+  // watchFeedPosts: Stream queries posts collection — UI StreamBuilder rebuilds on changes.
   Stream<List<CommunityPost>> watchFeedPosts({bool includeMyPosts = true}) {
     final viewer = _requireUser;
     final viewerUid = viewer.uid;
@@ -507,6 +522,7 @@ class CommunityRepository {
     });
   }
 
+  // Comments subcollection stream — new comments appear in the sheet without refreshing.
   Stream<List<CommunityComment>> watchComments(String postId) {
     return postsCol()
         .doc(postId)
@@ -763,6 +779,8 @@ class CommunityRepository {
     });
   }
 
+  // --- User discovery (suggestions and search by nameKeywords) ---
+
   Stream<List<CommunityUser>> watchAllUsers({int limit = 80}) {
     // Avoid relying on optional fields for ordering (some existing docs may not
     // have displayNameLower yet). Sort client-side for stability.
@@ -804,6 +822,8 @@ class CommunityRepository {
         .map((snap) => snap.docs.map(CommunityUser.fromDoc).toList());
   }
 
+  // --- In-app notifications (follow, like, comment, etc.) ---
+
   Stream<List<CommunityNotification>> watchNotifications() {
     final viewer = _requireUser;
     return notificationsCol(viewer.uid).limit(50).snapshots().map((snap) {
@@ -843,6 +863,8 @@ class CommunityRepository {
   }
 
   /// Creates a story document (base64 image via [encodeCommunityPostImagesForFirestore]).
+  // --- Stories (24h expiry, rings on Community, archive on profile) ---
+
   Future<String> createStory({
     required XFile image,
     required String textOverlay,
@@ -906,6 +928,7 @@ class CommunityRepository {
   }
 
   /// Active stories for the viewer and people they follow (grouped per user).
+  // Merges multiple Firestore story queries — Community strip rebuilds when any ring changes.
   Stream<List<CommunityStoryRing>> watchActiveStoryRings({
     required String viewerUid,
   }) {
