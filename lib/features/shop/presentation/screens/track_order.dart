@@ -29,6 +29,7 @@ class _MapZoomButton extends StatelessWidget {
   const _MapZoomButton({required this.icon, required this.onTap});
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
@@ -495,6 +496,7 @@ class _TrackOrderScreenState extends State<TrackOrderScreen> {
   }
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _background,

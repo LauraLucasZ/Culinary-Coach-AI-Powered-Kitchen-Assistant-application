@@ -757,9 +757,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             onPressed: currentItems.isEmpty
                                 ? null
                                 : () async {
-                                    await _ingredientService
-                                        .clearUserSelectedIngredients(userId);
-                                  },
+                              await _ingredientService
+                                  .clearUserSelectedIngredients(userId);
+                            },
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFFB87313),
                               side: const BorderSide(color: Color(0xFFB87313)),
@@ -1237,105 +1237,127 @@ class _PremiumCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    final isSmallHeight = size.height < 430;
+
+    final horizontalPadding = isLandscape ? 28.0 : 18.0;
+    final cardHeight = isLandscape ? (isSmallHeight ? 104.0 : 116.0) : 132.0;
+    final titleSize = isLandscape ? 15.0 : 16.0;
+    final descriptionSize = isLandscape ? 10.5 : 11.0;
+    final buttonVerticalPadding = isLandscape ? 6.0 : 8.0;
+    final buttonHorizontalPadding = isLandscape ? 12.0 : 13.0;
+    final iconSize = isLandscape ? 50.0 : 58.0;
+    final circleSize = isLandscape ? 116.0 : 132.0;
+    final textRightPadding = isLandscape ? 124.0 : 138.0;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
-          height: 132,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF1F1B16), Color(0xFF31251B)],
+        child: SizedBox(
+          width: double.infinity,
+          height: cardHeight,
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF1F1B16), Color(0xFF31251B)],
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.14),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.14),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: CustomPaint(painter: _PremiumPatternPainter()),
-              ),
-              Positioned(
-                right: -16,
-                bottom: -18,
-                child: Container(
-                  width: 132,
-                  height: 132,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0A73A).withValues(alpha: 0.16),
-                    shape: BoxShape.circle,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(painter: _PremiumPatternPainter()),
+                ),
+                Positioned(
+                  right: -16,
+                  bottom: -18,
+                  child: Container(
+                    width: circleSize,
+                    height: circleSize,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0A73A).withValues(alpha: 0.16),
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
-              ),
-              const Positioned(
-                right: 22,
-                bottom: 22,
-                child: Icon(
-                  Icons.ramen_dining_rounded,
-                  color: Color(0xFFF0A73A),
-                  size: 58,
+                Positioned(
+                  right: isLandscape ? 26 : 22,
+                  bottom: isLandscape ? 18 : 22,
+                  child: Icon(
+                    Icons.ramen_dining_rounded,
+                    color: const Color(0xFFF0A73A),
+                    size: iconSize,
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 138, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      'Go to premium now!',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Color(0xFFF0A73A),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    const Text(
-                      'Cook with the best recipes from around the world to your table.',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        height: 1.25,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 13,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0A73A),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: const Text(
-                        'Start 7-day FREE Trial',
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    isLandscape ? 12 : 16,
+                    textRightPadding,
+                    isLandscape ? 12 : 16,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Go to premium now!',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
+                          color: const Color(0xFFF0A73A),
+                          fontSize: titleSize,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 5),
+                      Text(
+                        'Cook with the best recipes from around the world to your table.',
+                        maxLines: isLandscape ? 1 : 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: descriptionSize,
+                          height: 1.25,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: isLandscape ? 8 : 12),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: buttonHorizontalPadding,
+                          vertical: buttonVerticalPadding,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0A73A),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: const Text(
+                          'Start 7-day FREE Trial',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1359,56 +1381,107 @@ class _CategoryChips extends StatelessWidget {
       ('Dinner', Icons.dinner_dining_rounded),
     ];
 
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 18),
-        scrollDirection: Axis.horizontal,
-        itemCount: categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final item = categories[index];
-          final selected = selectedLabel == item.$1;
-          final searchValue = item.$1 == 'See All' ? '' : item.$1;
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+    final horizontalPadding = isLandscape ? 28.0 : 18.0;
+    final chipHeight = isLandscape ? 34.0 : 38.0;
 
-          return GestureDetector(
-            onTap: () => onTap(searchValue),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 13),
-              decoration: BoxDecoration(
-                color: selected
-                    ? const Color(0xFFF0A73A)
-                    : const Color(0xFFFCF7E8),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: selected
-                      ? const Color(0xFFF0A73A)
-                      : const Color(0xFFE2C9A4),
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      child: SizedBox(
+        height: chipHeight,
+        width: double.infinity,
+        child: isLandscape
+            ? Row(
+          children: [
+            for (int index = 0; index < categories.length; index++) ...[
+              Expanded(
+                child: _CategoryChipButton(
+                  label: categories[index].$1,
+                  icon: categories[index].$2,
+                  selected: selectedLabel == categories[index].$1,
+                  onTap: () => onTap(
+                    categories[index].$1 == 'See All'
+                        ? ''
+                        : categories[index].$1,
+                  ),
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    item.$2,
-                    size: 15,
-                    color: selected ? Colors.white : const Color(0xFFB87313),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    item.$1,
-                    style: TextStyle(
-                      color: selected ? Colors.white : const Color(0xFF8B7355),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
+              if (index != categories.length - 1) const SizedBox(width: 8),
+            ],
+          ],
+        )
+            : ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: categories.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final item = categories[index];
+            return _CategoryChipButton(
+              label: item.$1,
+              icon: item.$2,
+              selected: selectedLabel == item.$1,
+              onTap: () => onTap(item.$1 == 'See All' ? '' : item.$1),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryChipButton extends StatelessWidget {
+  const _CategoryChipButton({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.symmetric(horizontal: isLandscape ? 8 : 13),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFFF0A73A) : const Color(0xFFFCF7E8),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? const Color(0xFFF0A73A) : const Color(0xFFE2C9A4),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: isLandscape ? MainAxisSize.max : MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: isLandscape ? 14 : 15,
+              color: selected ? Colors.white : const Color(0xFFB87313),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? Colors.white : const Color(0xFF8B7355),
+                  fontSize: isLandscape ? 11.5 : 12,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
@@ -1585,19 +1658,19 @@ class _RecipeCard extends StatelessWidget {
             Positioned.fill(
               child: recipe.image.isEmpty
                   ? Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Color(0xFF5A4B3A), Color(0xFF2F2520)],
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.restaurant,
-                        color: Color(0xFFFFD89B),
-                        size: 46,
-                      ),
-                    )
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFF5A4B3A), Color(0xFF2F2520)],
+                  ),
+                ),
+                child: const Icon(
+                  Icons.restaurant,
+                  color: Color(0xFFFFD89B),
+                  size: 46,
+                ),
+              )
                   : Image.network(recipe.image, fit: BoxFit.cover),
             ),
             Positioned.fill(
@@ -2519,13 +2592,13 @@ class _IngredientDropdownSection extends StatelessWidget {
         .map((item) => item.toLowerCase().trim())
         .toSet();
     final options =
-        availableValues
-            .map((item) => item.trim())
-            .where((item) => item.isNotEmpty)
-            .toSet()
-            .where((item) => !normalizedSelected.contains(item.toLowerCase()))
-            .toList()
-          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    availableValues
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .where((item) => !normalizedSelected.contains(item.toLowerCase()))
+        .toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

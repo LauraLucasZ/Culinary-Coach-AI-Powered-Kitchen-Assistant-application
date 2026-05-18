@@ -33,6 +33,7 @@ class _MapZoomButton extends StatelessWidget {
   const _MapZoomButton({required this.icon, required this.onTap});
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
@@ -475,6 +476,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFFFAF4),
@@ -672,6 +674,7 @@ class CartStep extends StatelessWidget {
   });
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     final items = cartItems ?? [];
 
@@ -927,6 +930,7 @@ class AddressDeliveryStep extends StatelessWidget {
   String _formatFee(double fee) => '${fee.toStringAsFixed(2)} EGP';
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -1451,6 +1455,7 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
   }
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     final point = selectedPoint ?? const LatLng(30.0444, 31.2357);
 
@@ -1748,6 +1753,7 @@ class PaymentStep extends StatelessWidget {
   });
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -2210,6 +2216,7 @@ class OrderSuccessScreen extends StatelessWidget {
   });
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
@@ -2555,6 +2562,7 @@ class MyOrdersScreen extends StatelessWidget {
   }
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     final userId = _currentUserId;
 
