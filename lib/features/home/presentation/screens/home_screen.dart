@@ -2207,6 +2207,13 @@ class _HomeTopHero extends StatelessWidget {
     final actionIconColor = isDarkMode
         ? Colors.white70
         : const Color(0xFF6C6C6C);
+    final searchBg = isDarkMode ? const Color(0xFF2A2A2A) : Colors.white;
+    final searchHintColor = isDarkMode
+        ? const Color(0xFF9A9A9A)
+        : const Color(0xFF888888);
+    final searchTextColor = isDarkMode
+        ? const Color(0xFFE3E3E3)
+        : const Color(0xFF2F2F2F);
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
@@ -2286,11 +2293,11 @@ class _HomeTopHero extends StatelessWidget {
                 height: isCompact ? 40 : 50,
                 padding: const EdgeInsets.only(left: 16, right: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: searchBg,
                   borderRadius: BorderRadius.circular(27),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.textPrimary.withValues(alpha: 0.12),
+                      color: Colors.black.withValues(alpha: isDarkMode ? 0.35 : 0.12),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -2298,9 +2305,9 @@ class _HomeTopHero extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.search_rounded,
-                      color: Color(0xFF888888),
+                      color: searchHintColor,
                       size: 28,
                     ),
                     const SizedBox(width: 8),
@@ -2309,11 +2316,12 @@ class _HomeTopHero extends StatelessWidget {
                         controller: searchController,
                         onChanged: onSearchChanged,
                         onSubmitted: onSearchSubmitted,
-                        cursorColor: const Color(0xFF6A6A6A),
-                        decoration: const InputDecoration(
+                        cursorColor: searchHintColor,
+                        style: TextStyle(color: searchTextColor),
+                        decoration: InputDecoration(
                           hintText: 'Search',
                           hintStyle: TextStyle(
-                            color: Color(0xFF9A9A9A),
+                            color: searchHintColor,
                             fontSize: 13,
                           ),
                           border: InputBorder.none,
@@ -2331,18 +2339,27 @@ class _HomeTopHero extends StatelessWidget {
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        IconButton(
-                          onPressed: onFilterTap,
-                          icon: const Icon(
-                            Icons.tune_rounded,
-                            color: Color(0xFF4D4D4D),
-                            size: 24,
+                        InkWell(
+                          onTap: onFilterTap,
+                          borderRadius: BorderRadius.circular(19),
+                          child: Container(
+                            height: 38,
+                            width: 38,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.primary.withValues(alpha: 0.14),
+                            ),
+                            child: const Icon(
+                              Icons.tune_rounded,
+                              color: AppColors.primaryDeep,
+                              size: 24,
+                            ),
                           ),
                         ),
                         if (activeFilterCount > 0)
                           Positioned(
-                            top: 4,
-                            right: 4,
+                            top: -2,
+                            right: -2,
                             child: Container(
                               constraints: const BoxConstraints(
                                 minWidth: 16,

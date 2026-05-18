@@ -1346,14 +1346,14 @@ class _PantryTopHeader extends StatelessWidget {
     final headerButtonIcon = isDarkMode ? Colors.white70 : const Color(0xFF6C6C6C);
     final searchBg = isDarkMode ? const Color(0xFF2A2A2A) : Colors.white;
     final searchIconColor = isDarkMode
-        ? const Color(0xFFD0D0D0)
+        ? const Color(0xFF9A9A9A)
         : const Color(0xFF888888);
     final searchTextColor = isDarkMode
         ? const Color(0xFFE3E3E3)
         : const Color(0xFF2F2F2F);
     final searchHintColor = isDarkMode
-        ? const Color(0xFFB0B0B0)
-        : const Color(0xFF6A6A6A);
+        ? const Color(0xFF9A9A9A)
+        : const Color(0xFF888888);
 
     return Container(
       width: double.infinity,
@@ -1465,7 +1465,7 @@ class _PantryTopHeader extends StatelessWidget {
                   borderRadius: BorderRadius.circular(27),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.textPrimary.withOpacity(0.12),
+                      color: Colors.black.withValues(alpha: isDarkMode ? 0.35 : 0.12),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -1500,19 +1500,22 @@ class _PantryTopHeader extends StatelessWidget {
                         ),
                       ),
                     ),
-                    IconButton(
-                      onPressed: onFilterTap,
-                      icon: Icon(
-                        Icons.keyboard_voice_rounded,
-                        color: isDarkMode
-                            ? const Color(0xFFD0D0D0)
-                            : const Color(0xFF4D4D4D),
-                        size: 27,
+                    InkWell(
+                      onTap: onFilterTap,
+                      borderRadius: BorderRadius.circular(19),
+                      child: Container(
+                        height: 38,
+                        width: 38,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.primary.withValues(alpha: 0.14),
+                        ),
+                        child: const Icon(
+                          Icons.keyboard_voice_rounded,
+                          color: AppColors.primaryDeep,
+                          size: 24,
+                        ),
                       ),
-                      splashRadius: 18,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                      visualDensity: VisualDensity.compact,
                     ),
                   ],
                 ),
