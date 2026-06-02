@@ -359,6 +359,46 @@ class CommunityRepository {
     });
   }
 
+  // This updates the main post content (caption + photo lists) after the owner edits it.
+  Future<void> updatePostFull({
+    required String postId,
+    required String caption,
+    required List<String> imageUrls,
+    required List<String> imageBase64List,
+  }) async {
+    final viewer = _requireUser;
+    final postRef = postsCol().doc(postId.trim());
+    final now = Timestamp.now();
+
+    // This cleans image lists to avoid saving empty strings to Firestore.
+    final cleanedUrls = imageUrls
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    final cleanedBase64 = imageBase64List
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(postRef);
+      if (!snap.exists) return;
+
+      // This blocks editing if the current user is not the post owner.
+      final data = snap.data() ?? const <String, dynamic>{};
+      final authorId = (data['authorId'] as String?)?.trim() ?? '';
+      if (authorId.isEmpty || authorId != viewer.uid) return;
+
+      // This saves the updated caption and photo lists into the same post document.
+      tx.update(postRef, {
+        'caption': caption.trim(),
+        'imageUrls': cleanedUrls,
+        'imageBase64List': cleanedBase64,
+        'updatedAt': now,
+      });
+    });
+  }
+
   Query<Map<String, dynamic>> queryPostsForUser(String uid) {
     // Avoid composite-index requirements (authorId + createdAt).
     // We'll sort client-side by createdAt for stability.
@@ -454,6 +494,25 @@ class CommunityRepository {
       final posts = snap.docs.map(CommunityPost.fromDoc).toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return posts;
+    });
+  }
+
+  // This reads one post document once, so we can open a post from a notification.
+  Future<CommunityPost?> getPostById(String postId) async {
+    final id = postId.trim();
+    if (id.isEmpty) return null;
+    final snap = await postsCol().doc(id).get();
+    if (!snap.exists) return null;
+    return CommunityPost.fromDoc(snap);
+  }
+
+  // This streams one post document, so the post details screen stays live.
+  Stream<CommunityPost?> watchPostById(String postId) {
+    final id = postId.trim();
+    if (id.isEmpty) return Stream.value(null);
+    return postsCol().doc(id).snapshots().map((d) {
+      if (!d.exists) return null;
+      return CommunityPost.fromDoc(d);
     });
   }
 
@@ -954,6 +1013,15 @@ class CommunityRepository {
       if (!d.exists) return null;
       return CommunityStory.fromDoc(d);
     });
+  }
+
+  // This reads one story document once, so we can open a story from a notification.
+  Future<CommunityStory?> getStoryById(String storyId) async {
+    final id = storyId.trim();
+    if (id.isEmpty) return null;
+    final snap = await storiesCol().doc(id).get();
+    if (!snap.exists) return null;
+    return CommunityStory.fromDoc(snap);
   }
 
   /// All stories authored by [uid] (including expired), newest first.

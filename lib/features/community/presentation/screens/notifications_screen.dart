@@ -3,7 +3,10 @@
 
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/core/widgets/app_default_user_avatar.dart';
+import 'package:culinary_coach_app/features/community/data/models/community_notification.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
+import 'package:culinary_coach_app/features/community/presentation/screens/post_details_screen.dart';
+import 'package:culinary_coach_app/features/community/presentation/screens/story_viewer_screen.dart';
 import 'package:culinary_coach_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:flutter/material.dart';
 
@@ -18,6 +21,105 @@ class NotificationsScreen extends StatefulWidget {
 // StatefulWidget: runs mark-all-read once when screen opens (didChangeDependencies).
 class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _marked = false;
+
+  // This checks if the notification is related to a post (like/comment/repost).
+  bool _isPostNotificationType(String type) {
+    final t = type.trim();
+    return t == 'post_like' || t == 'comment' || t == 'reply' || t == 'post_repost';
+  }
+
+  // This checks if the notification is related to a story (like on a story).
+  bool _isStoryNotificationType(String type) {
+    return type.trim() == 'story_like';
+  }
+
+  // This opens the right screen based on the notification type and ids.
+  Future<void> _openNotificationTarget(
+    BuildContext context,
+    CommunityRepository repo, {
+    required CommunityNotification n,
+  }) async {
+    // This keeps the behavior safe if the widget gets disposed during async work.
+    if (!context.mounted) return;
+
+    final type = n.type.trim();
+
+    // This opens the profile of the user who followed me.
+    if (type == 'follow') {
+      final uid = (n.senderUserId ?? '').trim().isNotEmpty
+          ? n.senderUserId!.trim()
+          : n.fromUid.trim();
+      if (uid.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This user is not available anymore.')),
+        );
+        return;
+      }
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => ProfileScreen(userId: uid)),
+      );
+      return;
+    }
+
+    // This opens the exact post for like/comment/repost notifications.
+    if (_isPostNotificationType(type)) {
+      final postId = (n.postId ?? '').trim();
+      if (postId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This post is not available anymore.')),
+        );
+        return;
+      }
+
+      // This checks if the post still exists before navigating.
+      final post = await repo.getPostById(postId);
+      if (!context.mounted) return;
+      if (post == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This post was deleted.')),
+        );
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => PostDetailsScreen(postId: postId)),
+      );
+      return;
+    }
+
+    // This opens the exact story for story-like notifications.
+    if (_isStoryNotificationType(type)) {
+      final storyId = (n.storyId ?? '').trim();
+      if (storyId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This story is not available anymore.')),
+        );
+        return;
+      }
+
+      // This checks if the story still exists before navigating.
+      final story = await repo.getStoryById(storyId);
+      if (!context.mounted) return;
+      if (story == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This story was deleted or expired.')),
+        );
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => StoryViewerScreen(stories: [story], initialIndex: 0),
+        ),
+      );
+      return;
+    }
+
+    // This shows a simple message if the notification type is unknown.
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('This notification cannot be opened.')),
+    );
+  }
 
   @override
   void didChangeDependencies() {
@@ -80,16 +182,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             separatorBuilder: (context, index) => const SizedBox(height: 10),
             itemBuilder: (context, i) {
               final n = items[i];
-              // InkWell: tap row → Navigator opens that user's ProfileScreen.
+              // InkWell: tap row → opens the post/story/profile based on notification type.
               return InkWell(
                 onTap: () async {
-                  if (n.fromUid.trim().isEmpty) return;
-                  if (!context.mounted) return;
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ProfileScreen(userId: n.fromUid),
-                    ),
-                  );
+                  await _openNotificationTarget(context, repo, n: n);
                 },
                 borderRadius: BorderRadius.circular(22),
                 child: Container(

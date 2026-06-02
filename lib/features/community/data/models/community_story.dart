@@ -13,7 +13,12 @@ class CommunityStory {
     required this.userName,
     required this.userAvatar,
     required this.imageBase64,
+    required this.imageBase64List,
     required this.textOverlay,
+    required this.textColorValue,
+    required this.textSize,
+    required this.textPosX,
+    required this.textPosY,
     required this.createdAt,
     required this.expiresAt,
     required this.likedBy,
@@ -25,7 +30,16 @@ class CommunityStory {
   final String userName;
   final String? userAvatar;
   final String imageBase64;
+  // This stores all story photos (new stories use a list, old stories may have only one).
+  final List<String> imageBase64List;
   final String textOverlay;
+  // This stores the chosen text color as an ARGB int, so we can rebuild the Color later.
+  final int textColorValue;
+  // This stores the chosen font size for the story text.
+  final double textSize;
+  // This stores the text position on the photo as 0..1 values (relative to image size).
+  final double textPosX;
+  final double textPosY;
   final DateTime createdAt;
   final DateTime expiresAt;
   final List<String> likedBy;
@@ -60,7 +74,9 @@ class CommunityStory {
   }
 
   /// Archive list thumbnail (image only; legacy video-only stories may be empty).
-  String get archiveThumbBase64 => imageBase64;
+  // This picks a stable thumbnail for the archive list (first image is enough).
+  String get archiveThumbBase64 =>
+      imageBase64List.isNotEmpty ? imageBase64List.first : imageBase64;
 
   // Parse Firestore document into a CommunityStory for the viewer and archive list.
   static CommunityStory fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -75,7 +91,14 @@ class CommunityStory {
         if (e is String && e.trim().isNotEmpty) liked.add(e.trim());
       }
     }
-    final b64 = _readImageBase64(data);
+    final b64List = _readImageBase64List(data);
+    final b64 = b64List.isNotEmpty ? b64List.first : _readImageBase64(data);
+
+    // This reads saved story text style values, or uses safe defaults if missing.
+    final textColorValue = _readInt(data['textColorValue'], fallback: 0xFFFFFFFF);
+    final textSize = _readDouble(data['textSize'], fallback: 20);
+    final textPosX = _readDouble(data['textPosX'], fallback: 0.5).clamp(0.0, 1.0);
+    final textPosY = _readDouble(data['textPosY'], fallback: 0.75).clamp(0.0, 1.0);
     return CommunityStory(
       id: doc.id,
       userId: (data['userId'] as String?)?.trim() ?? '',
@@ -86,7 +109,12 @@ class CommunityStory {
         return u;
       }(),
       imageBase64: b64,
+      imageBase64List: b64List.isNotEmpty ? b64List : (b64.isNotEmpty ? [b64] : const []),
       textOverlay: (data['textOverlay'] as String?) ?? '',
+      textColorValue: textColorValue,
+      textSize: textSize,
+      textPosX: textPosX,
+      textPosY: textPosY,
       createdAt: created,
       expiresAt: expires,
       likedBy: liked,
@@ -103,6 +131,34 @@ class CommunityStory {
       if (first is String && first.trim().isNotEmpty) return first.trim();
     }
     return '';
+  }
+
+  // This reads `imageBase64List` and filters out empty strings.
+  static List<String> _readImageBase64List(Map<String, dynamic> data) {
+    final raw = data['imageBase64List'];
+    if (raw is! List) return const <String>[];
+    return raw
+        .whereType<String>()
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  // This reads an int from Firestore safely (some older docs store numbers as strings).
+  static int _readInt(dynamic v, {required int fallback}) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v.trim()) ?? fallback;
+    return fallback;
+  }
+
+  // This reads a double from Firestore safely (some older docs store numbers as strings).
+  static double _readDouble(dynamic v, {required double fallback}) {
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v.trim()) ?? fallback;
+    return fallback;
   }
 
   static DateTime _readTime(dynamic raw) {
