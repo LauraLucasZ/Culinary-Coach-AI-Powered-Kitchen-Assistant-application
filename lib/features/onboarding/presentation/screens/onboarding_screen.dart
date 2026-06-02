@@ -18,7 +18,9 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingPageState extends State<OnboardingScreen> {
+  // page controller drives onboarding slide navigation programmatically
   late final PageController _pageController;
+  // auth controller is used here for google sign in from final onboarding slide
   final AuthController _authController = AuthController();
   int _currentPage = 0;
 
@@ -27,27 +29,29 @@ class _OnboardingPageState extends State<OnboardingScreen> {
     _SlideData(
       title: 'Scan Your\nIngredients',
       description:
-          'Use camera scanning or manual selection to detect what is in your kitchen and unlock recipe ideas instantly.',
+      'Use camera scanning or manual selection to detect what is in your kitchen and unlock recipe ideas instantly.',
       imagePath: AppAssets.scanPic,
       blobColor: Color(0xFFCB6B2E),
     ),
     _SlideData(
       title: 'Cook Step\nby Step',
       description:
-          'Start cooking mode with voice guidance, visual cues, and timers so you can pause, resume, skip, or extend any step.',
+      'Start cooking mode with voice guidance, visual cues, and timers so you can pause, resume, skip, or extend any step.',
       imagePath: AppAssets.cookingPic,
       blobColor: Color(0xFF5A9A44),
     ),
     _SlideData(
       title: 'Join the\nFood Community',
       description:
-          'Share your dishes, post history, and engage with other cooks through likes, comments, follows, and inspiration.',
+      'Share your dishes, post history, and engage with other cooks through likes, comments, follows, and inspiration.',
       imagePath: AppAssets.communityPic,
       blobColor: Color(0xFFB85C28),
     ),
   ];
 
   void _next() {
+    // pages 0..4 are handled inside onboarding
+    // once flow ends, user moves to dedicated sign-up screen route
     if (_currentPage < 4) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 380),
@@ -67,6 +71,7 @@ class _OnboardingPageState extends State<OnboardingScreen> {
   }
 
   void _back() {
+    // used by final slide back button to return to previous onboarding page
     if (_currentPage > 0) {
       _pageController.previousPage(
         duration: const Duration(milliseconds: 300),
@@ -76,6 +81,7 @@ class _OnboardingPageState extends State<OnboardingScreen> {
   }
 
   Future<void> _continueWithGoogle() async {
+    // this allows immediate auth from onboarding without filling email form
     final ok = await _authController.signInWithGoogle();
     if (!mounted) return;
 
@@ -100,6 +106,7 @@ class _OnboardingPageState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
+      // rebuilds when auth loading/error changes during google sign in
       animation: _authController,
       builder: (context, _) => Scaffold(
         backgroundColor: _kBg,
@@ -237,7 +244,7 @@ class _StorySlide extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
       child: Stack(
         children: [
-          // ── Full-screen card ────────────────────────────────────────────
+          //  Full-screen card
           Positioned.fill(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(32),
@@ -339,7 +346,7 @@ class _StorySlide extends StatelessWidget {
             ),
           ),
 
-          // ── Cream notch at bottom-right ─────────────────────────────────
+          //  Cream notch at bottom-right
           // Large circle in background colour bites into the card corner
           Positioned(
             right: -38,
@@ -354,7 +361,7 @@ class _StorySlide extends StatelessWidget {
             ),
           ),
 
-          // ── Arrow chevron ───────────────────────────────────────────────
+          //  Arrow chevron
           Positioned(
             right: 20,
             bottom: 20,
@@ -377,7 +384,7 @@ class _StorySlide extends StatelessWidget {
   }
 }
 
-// ─── Sign-up slide ────────────────────────────────────────────────────────────
+// Sign-up slide
 
 class _SignUpSlide extends StatelessWidget {
   const _SignUpSlide({
@@ -536,7 +543,7 @@ class _SignUpSlide extends StatelessWidget {
   }
 }
 
-// ─── Helper widgets ───────────────────────────────────────────────────────────
+//  Helper widgets
 
 /// Dark, atmospheric gradient that simulates a moody food photograph.
 class _FoodPhoto extends StatelessWidget {
@@ -669,7 +676,7 @@ class _Dot extends StatelessWidget {
   }
 }
 
-// ─── Data model ───────────────────────────────────────────────────────────────
+//  Data model
 
 class _SlideData {
   const _SlideData({

@@ -3,6 +3,7 @@ import 'dart:async' show unawaited;
 import 'package:culinary_coach_app/features/home/data/models/recipe_match.dart';
 import 'package:culinary_coach_app/features/home/data/services/history_recipes_service.dart';
 import 'package:culinary_coach_app/features/start_cooking/data/services/cooking_step_media_matcher.dart';
+import 'package:culinary_coach_app/features/start_cooking/data/services/openai_cooking_steps_service.dart';
 import 'package:culinary_coach_app/features/start_cooking/data/services/openai_cooking_voice_service.dart';
 import 'package:flutter/material.dart';
 
@@ -20,8 +21,28 @@ class StartCookingScreen extends StatefulWidget {
 }
 
 class _StartCookingScreenState extends State<StartCookingScreen> {
+  // this list targets newly added gifs that visually look tiny because of inner padding
+  static const Set<String> _boostedGifFileNames = <String>{
+    'chopping with knife.gif',
+    'cutting the fish .gif',
+    'grind something.gif',
+    'hand mixer.gif',
+    'knead a dough with hands.gif',
+    'letting the dough rest.gif',
+    'pouring and straining juice into a cup.gif',
+    'pouring the sauce on cooked food.gif',
+    'shape dough into balls.gif',
+    'spread a dough in baking pan.gif',
+  };
+  // this lets us reduce scale for specific gifs that become too tall on screen
+  static const Map<String, double> _gifScaleOverrides = <String, double>{
+    'pouring the sauce on cooked food.gif': 1.2,
+  };
+
   // this speaks each step using openai tts or fallback tts
   final OpenAiCookingVoiceService _voiceService = OpenAiCookingVoiceService();
+  // this cleans and translates instructions using openai when available
+  final OpenAiCookingStepsService _stepsService = OpenAiCookingStepsService();
   // this chooses the best gif for the current step text
   final CookingStepMediaMatcher _mediaMatcher = CookingStepMediaMatcher();
   // this saves and restores cooking progress from started_recipes
@@ -30,7 +51,7 @@ class _StartCookingScreenState extends State<StartCookingScreen> {
   final Map<int, String> _assetByStepIndex = <int, String>{};
 
   // these are the final cleaned steps shown in this flow
-  late final List<String> _steps;
+  List<String> _steps = const <String>[];
   // this tells which step is currently visible
   int _currentStepIndex = 0;
   // this controls speaking state for ui label
@@ -45,8 +66,8 @@ class _StartCookingScreenState extends State<StartCookingScreen> {
   @override
   void initState() {
     super.initState();
-    // this prepares instruction list before first render
-    _steps = _buildDisplaySteps(widget.recipe.instructions);
+    // this shows a quick placeholder while cleaned steps are being prepared
+    _steps = const <String>['preparing clean cooking instructions'];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // this runs after first frame so async work does not block build
       _initializeFlow();
@@ -55,10 +76,39 @@ class _StartCookingScreenState extends State<StartCookingScreen> {
 
   // this sets up voice, restores old step if exists, then starts current step
   Future<void> _initializeFlow() async {
+    await _prepareSteps();
+    if (!mounted || _steps.isEmpty) return;
     await _setupVoice();
     await _restoreSavedProgressIfAny();
     await _loadGifForCurrentStep();
     await _speakCurrentStep();
+  }
+
+  // this asks openai to clean and translate instructions before cooking starts
+  Future<void> _prepareSteps() async {
+    final availableAssets = await _mediaMatcher.listAvailableGifAssets();
+    final plan = await _stepsService.cleanInstructionPlan(
+      instructions: widget.recipe.instructions,
+      recipeTitle: widget.recipe.title,
+      availableGifAssetPaths: availableAssets,
+    );
+    final pathByFileName = <String, String>{
+      for (final asset in availableAssets) asset.split('/').last: asset,
+    };
+    if (!mounted) return;
+    setState(() {
+      _steps = plan.stepTexts;
+      _currentStepIndex = 0;
+      _assetByStepIndex.clear();
+      // this preloads ai-selected gifs so we skip local matching when ai gave a clear choice
+      for (var i = 0; i < plan.steps.length; i++) {
+        final gifFileName = plan.steps[i].gifFileName;
+        if (gifFileName == null || gifFileName.isEmpty) continue;
+        final assetPath = pathByFileName[gifFileName];
+        if (assetPath == null) continue;
+        _assetByStepIndex[i] = assetPath;
+      }
+    });
   }
 
   // this prepares tts service one time
@@ -66,40 +116,17 @@ class _StartCookingScreenState extends State<StartCookingScreen> {
     await _voiceService.init();
   }
 
-  // this normalizes instructions so screen always has usable step list
-  List<String> _buildDisplaySteps(List<String> instructions) {
-    if (instructions.isEmpty) {
-      return const <String>[
-        'Instructions are not available for this recipe. Please go back and pick another recipe.',
-      ];
-    }
-
-    if (instructions.length > 1) {
-      return instructions
-          .map((step) => step.trim())
-          .where((step) => step.isNotEmpty)
-          .toList();
-    }
-
-    final single = instructions.first.trim();
-    if (single.isEmpty) return const <String>['No instructions provided.'];
-
-    final splitByNumbering = single.split(RegExp(r'\s(?=\d+[\)\.\-])'));
-    if (splitByNumbering.length > 1) {
-      final cleaned = splitByNumbering
-          .map(
-            (step) => step.replaceFirst(RegExp(r'^\d+[\)\.\-]\s*'), '').trim(),
-          )
-          .where((step) => step.isNotEmpty)
-          .toList();
-      if (cleaned.isNotEmpty) return cleaned;
-    }
-
-    return [single];
-  }
-
   // this returns text of currently active step
   String get _currentStepText => _steps[_currentStepIndex];
+
+  // this gives extra scale only to new gifs that look too small
+  double _gifScaleForAsset(String? assetPath) {
+    if (assetPath == null || assetPath.isEmpty) return 1.0;
+    final fileName = assetPath.split('/').last;
+    final overrideScale = _gifScaleOverrides[fileName];
+    if (overrideScale != null) return overrideScale;
+    return _boostedGifFileNames.contains(fileName) ? 2.9 : 1.0;
+  }
 
   // this loads saved step from firestore if recipe was started before
   Future<void> _restoreSavedProgressIfAny() async {
@@ -245,10 +272,12 @@ class _StartCookingScreenState extends State<StartCookingScreen> {
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              // this gives a different gif size based on orientation
+              // this gives a larger gif size while staying layout-safe
               final gifHeight = isLandscape
-                  ? (constraints.maxHeight * 0.30).clamp(120.0, 170.0)
-                  : (constraints.maxHeight * 0.36).clamp(190.0, 250.0);
+                  ? (constraints.maxHeight * 0.34).clamp(140.0, 200.0)
+                  : (constraints.maxHeight * 0.42).clamp(220.0, 300.0);
+              // this reads scale once so each step keeps same visual size
+              final gifScale = _gifScaleForAsset(currentAsset);
 
               // this landscape branch uses scroll to avoid overflow when height is short
               if (isLandscape) {
@@ -291,7 +320,8 @@ class _StartCookingScreenState extends State<StartCookingScreen> {
                       ),
                       const SizedBox(height: 10),
                       SizedBox(
-                        height: gifHeight,
+                        // this reserves extra layout space so scaled gifs do not overlap step text
+                        height: gifHeight * gifScale,
                         child: Center(
                           child: currentAsset == null || _isLoadingAsset
                               ? const SizedBox(
@@ -302,19 +332,25 @@ class _StartCookingScreenState extends State<StartCookingScreen> {
                                     color: Color(0xFFB87313),
                                   ),
                                 )
-                              : Image.asset(
-                                  // this displays selected gif for the step
-                                  currentAsset,
-                                  fit: BoxFit.contain,
-                                  filterQuality: FilterQuality.high,
-                                  gaplessPlayback: true,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Icon(
-                                      Icons.image_not_supported_outlined,
-                                      color: Color(0xFF8D806E),
-                                      size: 36,
-                                    );
-                                  },
+                              : Transform.scale(
+                                  // this scales only selected new gifs while preserving old gif size
+                                  scale: gifScale,
+                                  child: Image.asset(
+                                    // this displays selected gif for the step
+                                    currentAsset,
+                                    height: gifHeight,
+                                    width: constraints.maxWidth,
+                                    fit: BoxFit.contain,
+                                    filterQuality: FilterQuality.high,
+                                    gaplessPlayback: true,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(
+                                        Icons.image_not_supported_outlined,
+                                        color: Color(0xFF8D806E),
+                                        size: 36,
+                                      );
+                                    },
+                                  ),
                                 ),
                         ),
                       ),
@@ -448,51 +484,77 @@ class _StartCookingScreenState extends State<StartCookingScreen> {
                       ),
                     ),
                     Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            height: gifHeight,
-                            child: Center(
-                              child: currentAsset == null || _isLoadingAsset
-                                  ? const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.4,
-                                        color: Color(0xFFB87313),
-                                      ),
-                                    )
-                                  : Image.asset(
-                                      // this displays selected gif for the step
-                                      currentAsset,
-                                      fit: BoxFit.contain,
-                                      filterQuality: FilterQuality.high,
-                                      gaplessPlayback: true,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                            return const Icon(
-                                              Icons
-                                                  .image_not_supported_outlined,
-                                              color: Color(0xFF8D806E),
-                                              size: 36,
-                                            );
-                                          },
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          Text(
-                            _currentStepText,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: stepTextColor,
-                              height: 1.38,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                      child: LayoutBuilder(
+                        builder: (context, bodyConstraints) {
+                          // this limits gif box based on available portrait height to prevent overflow
+                          final maxGifSlotHeight = (bodyConstraints.maxHeight - 92)
+                              .clamp(120.0, bodyConstraints.maxHeight)
+                              .toDouble();
+                          final desiredGifSlotHeight =
+                              (gifHeight * gifScale).toDouble();
+                          final effectiveGifSlotHeight = desiredGifSlotHeight
+                              .clamp(120.0, maxGifSlotHeight)
+                              .toDouble();
+                          // this keeps base image size in sync after slot clamping
+                          final effectiveBaseGifHeight =
+                              (effectiveGifSlotHeight / gifScale)
+                                  .clamp(90.0, gifHeight)
+                                  .toDouble();
+
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                // this reserves safe space for boosted gifs without pushing text out
+                                height: effectiveGifSlotHeight,
+                                child: Center(
+                                  child: currentAsset == null || _isLoadingAsset
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.4,
+                                            color: Color(0xFFB87313),
+                                          ),
+                                        )
+                                      : Transform.scale(
+                                          // this scales only selected new gifs while preserving old gif size
+                                          scale: gifScale,
+                                          child: Image.asset(
+                                            // this displays selected gif for the step
+                                            currentAsset,
+                                            height: effectiveBaseGifHeight,
+                                            width: constraints.maxWidth,
+                                            fit: BoxFit.contain,
+                                            filterQuality: FilterQuality.high,
+                                            gaplessPlayback: true,
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                                  return const Icon(
+                                                    Icons
+                                                        .image_not_supported_outlined,
+                                                    color: Color(0xFF8D806E),
+                                                    size: 36,
+                                                  );
+                                                },
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              Text(
+                                _currentStepText,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: stepTextColor,
+                                  height: 1.38,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                     Row(
