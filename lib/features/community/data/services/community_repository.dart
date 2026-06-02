@@ -359,6 +359,61 @@ class CommunityRepository {
     });
   }
 
+  Future<void> deleteRepost({required String repostPostId}) async {
+    final viewer = _requireUser;
+    final repostRef = postsCol().doc(repostPostId.trim());
+    final now = Timestamp.now();
+
+    var originalId = '';
+    var originalAuthorId = '';
+
+    await _firestore.runTransaction((tx) async {
+      final repostSnap = await tx.get(repostRef);
+      if (!repostSnap.exists) return;
+      final data = repostSnap.data() ?? const <String, dynamic>{};
+
+      // Student note: user can delete only posts they own.
+      final authorId = (data['authorId'] as String?)?.trim() ?? '';
+      if (authorId.isEmpty || authorId != viewer.uid) return;
+
+      // Student note: reposts have `repostOfPostId`; originals don't.
+      originalId = (data['repostOfPostId'] as String?)?.trim() ?? '';
+      originalAuthorId = (data['originalAuthorId'] as String?)?.trim() ?? '';
+      if (originalId.isEmpty) return; // Not a repost → don't delete from "delete repost".
+
+      // Student note: this is a repost, so we remove the repost copy only.
+      // The original post should stay.
+      tx.delete(repostRef);
+
+      // Important: do NOT decrement `communityPosts` here (reposts never increment it).
+      tx.set(
+        userDoc(viewer.uid),
+        {'updatedAt': now},
+        SetOptions(merge: true),
+      );
+    });
+
+    // Student note: after deleting, the feed StreamBuilder refreshes automatically
+    // because Firestore emits a new snapshot without the repost document.
+
+    // Best-effort: update repost count + notification; if rules block it, the repost
+    // should still be deleted from the feed (the original post stays).
+    if (originalId.isNotEmpty) {
+      try {
+        await postsCol()
+            .doc(originalId)
+            .update({'repostCount': FieldValue.increment(-1)});
+      } catch (_) {}
+    }
+    if (originalAuthorId.isNotEmpty && originalAuthorId != viewer.uid) {
+      try {
+        await notificationsCol(originalAuthorId)
+            .doc('post_repost_${originalId}_${viewer.uid}')
+            .delete();
+      } catch (_) {}
+    }
+  }
+
   // This updates the main post content (caption + photo lists) after the owner edits it.
   Future<void> updatePostFull({
     required String postId,
@@ -966,9 +1021,9 @@ class CommunityRepository {
   /// Creates a story document (base64 image via [encodeCommunityPostImagesForFirestore]).
   // --- Stories (24h expiry, rings on Community, archive on profile) ---
 
-  // This creates a story with multiple photos and saved text style values.
-  Future<String> createStoryFull({
-    required List<XFile> images,
+  // This creates a story with one photo and saved text style values.
+  Future<String> createStoryWithStyle({
+    required XFile image,
     required String textOverlay,
     required int textColorValue,
     required double textSize,
@@ -979,8 +1034,8 @@ class CommunityRepository {
     final viewerData = await getUser(viewer.uid);
     final storyRef = storiesCol().doc();
 
-    // This converts the selected photos to Base64 so they can be stored in Firestore.
-    final encoded = await encodeCommunityPostImagesForFirestore(images);
+    // This converts the selected photo to Base64 so it can be stored in Firestore.
+    final encoded = await encodeCommunityPostImagesForFirestore([image]);
     if (encoded.isEmpty) {
       throw StateError(
         'Could not process the photo. Try again or pick a different image.',
@@ -992,13 +1047,14 @@ class CommunityRepository {
     final nowTs = Timestamp.fromDate(created);
     final expiresTs = Timestamp.fromDate(expires);
 
-    // This saves the story document with photos, text, and style values.
+    // This saves the story document with the photo, text, and style values.
     await storyRef.set({
       'userId': viewer.uid.trim(),
       'userName': viewerData?.displayName ?? (viewer.displayName ?? 'User'),
       'userAvatar': viewerData?.profileImageUrl ?? viewer.photoURL,
       'imageBase64': encoded.first,
-      'imageBase64List': encoded,
+      // This keeps the list field for older code, but we store only one photo.
+      'imageBase64List': [encoded.first],
       'textOverlay': textOverlay,
       'textColorValue': textColorValue,
       'textSize': textSize,
@@ -1278,7 +1334,7 @@ class CommunityRepository {
   Future<void> updateStoryFull({
     required String storyId,
     required String textOverlay,
-    required List<String> imageBase64List,
+    required String imageBase64,
     required int textColorValue,
     required double textSize,
     required double textPosX,
@@ -1288,12 +1344,8 @@ class CommunityRepository {
     final storyRef = storiesCol().doc(storyId.trim());
     final now = Timestamp.now();
 
-    // This removes empty strings so Firestore does not store broken images.
-    final cleaned = imageBase64List
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-    if (cleaned.isEmpty) return;
+    // This cleans the Base64 string so Firestore does not store extra spaces.
+    final cleaned = imageBase64.trim();
 
     await _firestore.runTransaction((tx) async {
       final snap = await tx.get(storyRef);
@@ -1306,8 +1358,9 @@ class CommunityRepository {
 
       // This saves the edited photos and text style values into the story doc.
       tx.update(storyRef, {
-        'imageBase64': cleaned.first,
-        'imageBase64List': cleaned,
+        'imageBase64': cleaned,
+        // This keeps the list field for older code, but we store only one photo.
+        'imageBase64List': cleaned.isEmpty ? <String>[] : [cleaned],
         'textOverlay': textOverlay,
         'textColorValue': textColorValue,
         'textSize': textSize,

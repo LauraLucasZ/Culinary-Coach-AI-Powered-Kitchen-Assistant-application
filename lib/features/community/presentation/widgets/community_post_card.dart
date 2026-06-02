@@ -59,8 +59,11 @@ class CommunityPostCard extends StatelessWidget {
             authorName: post.authorName,
             authorProfileImageUrl: post.authorProfileImageUrl,
             createdAt: post.createdAt,
+            // Student note: only the owner should see edit/delete options.
             isOwner: (currentUid ?? '').trim().isNotEmpty &&
                 (currentUid ?? '').trim() == post.authorId.trim(),
+            // Student note: reposts should not be editable (only removable).
+            isRepost: post.isRepost,
             onEdit: () async {
               // This opens the full post editor (caption + photos).
               await Navigator.of(context).push<bool>(
@@ -70,6 +73,7 @@ class CommunityPostCard extends StatelessWidget {
               );
             },
             onDelete: () async {
+              final isRepost = post.isRepost;
               final ok = await showDialog<bool>(
                 context: context,
                 builder: (ctx) {
@@ -80,9 +84,14 @@ class CommunityPostCard extends StatelessWidget {
                   return AlertDialog(
                     backgroundColor: bg,
                     surfaceTintColor: Colors.transparent,
-                    title: Text('Delete Post?', style: TextStyle(color: title, fontWeight: FontWeight.w800)),
+                    title: Text(
+                      isRepost ? 'Delete Repost?' : 'Delete Post?',
+                      style: TextStyle(color: title, fontWeight: FontWeight.w800),
+                    ),
                     content: Text(
-                      'This will permanently delete your post.',
+                      isRepost
+                          ? 'This will remove only your repost (the original post will stay).'
+                          : 'This will permanently delete your post.',
                       style: TextStyle(color: secondary, fontWeight: FontWeight.w600),
                     ),
                     actions: [
@@ -103,7 +112,11 @@ class CommunityPostCard extends StatelessWidget {
               );
               if (ok != true) return;
               try {
-                await repo.deletePost(postId: post.id);
+                if (isRepost) {
+                  await repo.deleteRepost(repostPostId: post.id);
+                } else {
+                  await repo.deletePost(postId: post.id);
+                }
               } catch (_) {}
             },
             onAuthorTap: () {
@@ -417,6 +430,7 @@ class _HeaderRow extends StatelessWidget {
     required this.createdAt,
     required this.onAuthorTap,
     required this.isOwner,
+    required this.isRepost,
     required this.onEdit,
     required this.onDelete,
   });
@@ -427,6 +441,7 @@ class _HeaderRow extends StatelessWidget {
   final DateTime createdAt;
   final VoidCallback onAuthorTap;
   final bool isOwner;
+  final bool isRepost;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -492,26 +507,28 @@ class _HeaderRow extends StatelessWidget {
             color: isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
             surfaceTintColor: Colors.transparent,
             onSelected: (v) {
-              if (v == 'edit') onEdit();
+              // Student note: if it's a repost, we don't allow editing at all.
+              if (v == 'edit' && !isRepost) onEdit();
               if (v == 'delete') onDelete();
             },
             itemBuilder: (context) => [
-              PopupMenuItem<String>(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    const Icon(Icons.edit_rounded, color: AppColors.primaryDeep, size: 18),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Edit Post',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: titleColor,
-                          ),
-                    ),
-                  ],
+              if (!isRepost)
+                PopupMenuItem<String>(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.edit_rounded, color: AppColors.primaryDeep, size: 18),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Edit Post',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: titleColor,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               PopupMenuItem<String>(
                 value: 'delete',
                 child: Row(
@@ -519,7 +536,7 @@ class _HeaderRow extends StatelessWidget {
                     const Icon(Icons.delete_outline_rounded, color: Color(0xFFB3261E), size: 18),
                     const SizedBox(width: 10),
                     Text(
-                      'Delete Post',
+                      isRepost ? 'Delete Repost' : 'Delete Post',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: titleColor,

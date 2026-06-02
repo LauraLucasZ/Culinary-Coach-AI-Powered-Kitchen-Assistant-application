@@ -24,38 +24,45 @@ class CreateStoryScreen extends StatefulWidget {
 }
 
 class _CreateStoryScreenState extends State<CreateStoryScreen> {
-  // StatefulWidget: preview bytes in state; setState after ImagePicker returns.
+  // StatefulWidget: we keep the saved values and only write to Firestore on "Post Story".
   final _overlayController = TextEditingController();
   final _overlayScrollController = ScrollController();
   final _picker = ImagePicker();
   final _repo = CommunityRepository();
 
-  // This keeps the photos the user selected for the story.
-  final List<XFile> _images = [];
+  // This keeps the single story photo that the user selected.
+  XFile? _image;
+  Uint8List? _imageBytes;
 
-  // This controls which photo is shown in the big preview.
-  int _activeIndex = 0;
-
-  // These values control story text style and position on the photo.
-  int _textColorValue = 0xFFFFFFFF;
-  double _textSize = 20;
-  double _textPosX = 0.5;
-  double _textPosY = 0.75;
+  // These notifiers update only the preview, so the screen does not flash.
+  final ValueNotifier<String> _previewText = ValueNotifier<String>('');
+  final ValueNotifier<int> _textColorValue = ValueNotifier<int>(0xFFFFFFFF);
+  final ValueNotifier<double> _textSize = ValueNotifier<double>(20);
+  final ValueNotifier<Offset> _textPos = ValueNotifier<Offset>(const Offset(0.5, 0.75));
 
   bool _submitting = false;
 
   bool get _canSubmit =>
-      _images.isNotEmpty &&
+      _imageBytes != null &&
+      _imageBytes!.isNotEmpty &&
       !_submitting;
 
   @override
   void initState() {
     super.initState();
-    _overlayController.addListener(() => setState(() {}));
+    // This keeps the preview text in sync without rebuilding the whole page.
+    _previewText.value = _overlayController.text;
+    _overlayController.addListener(() {
+      _previewText.value = _overlayController.text;
+    });
   }
 
   @override
   void dispose() {
+    _previewText.dispose();
+    _textColorValue.dispose();
+    _textSize.dispose();
+    _textPos.dispose();
     _overlayController.dispose();
     _overlayScrollController.dispose();
     super.dispose();
@@ -107,16 +114,19 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
       return;
     }
     try {
-      // This allows picking multiple photos for one story.
-      final files = await _picker.pickMultiImage(
+      // This picks one photo for the story.
+      final file = await _picker.pickImage(
+        source: ImageSource.gallery,
         imageQuality: 88,
         maxWidth: 1600,
       );
-      if (files.isEmpty) return;
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) return;
       if (!mounted) return;
       setState(() {
-        _images.addAll(files);
-        _activeIndex = _activeIndex.clamp(0, _images.length - 1);
+        _image = file;
+        _imageBytes = bytes;
       });
     } catch (e) {
       if (!mounted) return;
@@ -145,10 +155,12 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
         maxWidth: 1600,
       );
       if (file == null) return;
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) return;
       if (!mounted) return;
       setState(() {
-        _images.add(file);
-        _activeIndex = _images.length - 1;
+        _image = file;
+        _imageBytes = bytes;
       });
     } catch (e) {
       if (!mounted) return;
@@ -161,18 +173,20 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
   // Upload story image as Base64 to Firestore with 24h expiry via repo.createStory.
   Future<void> _submit() async {
     if (_submitting || !_canSubmit) return;
-    if (_images.isEmpty) return;
+    final img = _image;
+    final bytes = _imageBytes;
+    if (img == null || bytes == null || bytes.isEmpty) return;
 
     setState(() => _submitting = true);
     try {
-      // This creates the story with photos and saved text style values.
-      await _repo.createStoryFull(
-        images: _images,
+      // This creates the story and saves the chosen text style values.
+      await _repo.createStoryWithStyle(
+        image: img,
         textOverlay: _overlayController.text,
-        textColorValue: _textColorValue,
-        textSize: _textSize,
-        textPosX: _textPosX,
-        textPosY: _textPosY,
+        textColorValue: _textColorValue.value,
+        textSize: _textSize.value,
+        textPosX: _textPos.value.dx,
+        textPosY: _textPos.value.dy,
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -311,7 +325,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                 ),
                 const SizedBox(height: 18),
                 // This shows the story preview with draggable text.
-                if (_images.isNotEmpty)
+                if (_imageBytes != null && _imageBytes!.isNotEmpty)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(22),
                     child: AspectRatio(
@@ -320,75 +334,13 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                         builder: (context, constraints) {
                           final size =
                               Size(constraints.maxWidth, constraints.maxHeight);
-                          final overlayColor = Color(_textColorValue);
-                          final file = _images[_activeIndex.clamp(0, _images.length - 1)];
-                          return FutureBuilder<Uint8List>(
-                            future: file.readAsBytes(),
-                            builder: (context, snap) {
-                              final bytes = snap.data;
-                              return Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  if (bytes != null && bytes.isNotEmpty)
-                                    Image.memory(bytes, fit: BoxFit.cover)
-                                  else
-                                    Container(
-                                      color: isDarkMode
-                                          ? const Color(0xFF1E1E1E)
-                                          : AppColors.surfaceMuted,
-                                      alignment: Alignment.center,
-                                      child: const CircularProgressIndicator(
-                                        color: AppColors.primaryDeep,
-                                      ),
-                                    ),
-
-                                  // This draws the story text using the current style values.
-                                  if (_overlayController.text.trim().isNotEmpty)
-                                    Positioned(
-                                      left: _textPosX * size.width,
-                                      top: _textPosY * size.height,
-                                      child: GestureDetector(
-                                        // This lets the user drag the text anywhere on the image.
-                                        onPanUpdate: (d) {
-                                          setState(() {
-                                            _textPosX = (_textPosX + d.delta.dx / size.width)
-                                                .clamp(0.0, 1.0);
-                                            _textPosY = (_textPosY + d.delta.dy / size.height)
-                                                .clamp(0.0, 1.0);
-                                          });
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 10,
-                                            vertical: 6,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black.withValues(alpha: 0.18),
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Text(
-                                            _overlayController.text,
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: overlayColor,
-                                              fontSize: _textSize,
-                                              fontWeight: FontWeight.w800,
-                                              height: 1.2,
-                                              shadows: const [
-                                                Shadow(
-                                                  offset: Offset(0, 1),
-                                                  blurRadius: 6,
-                                                  color: Colors.black54,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              );
-                            },
+                          return _StoryTextPreview(
+                            size: size,
+                            imageBytes: _imageBytes!,
+                            text: _previewText,
+                            textColorValue: _textColorValue,
+                            textSize: _textSize,
+                            textPos: _textPos,
                           );
                         },
                       ),
@@ -414,7 +366,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                   ),
                 const SizedBox(height: 14),
 
-                // This lets the user change the font size.
+                // This lets the user change the font size without flashing the whole page.
                 Container(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   decoration: BoxDecoration(
@@ -433,11 +385,11 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                             ),
                       ),
                       Slider(
-                        value: _textSize.clamp(12.0, 44.0),
+                        value: _textSize.value.clamp(12.0, 44.0),
                         min: 12,
                         max: 44,
                         activeColor: AppColors.primaryDeep,
-                        onChanged: _submitting ? null : (v) => setState(() => _textSize = v),
+                        onChanged: _submitting ? null : (v) => _textSize.value = v,
                       ),
                     ],
                   ),
@@ -476,7 +428,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                             0xFF000000,
                           ])
                             InkWell(
-                              onTap: _submitting ? null : () => setState(() => _textColorValue = c),
+                              onTap: _submitting ? null : () => _textColorValue.value = c,
                               borderRadius: BorderRadius.circular(999),
                               child: Container(
                                 height: 34,
@@ -485,10 +437,10 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                                   shape: BoxShape.circle,
                                   color: Color(c),
                                   border: Border.all(
-                                    color: _textColorValue == c
+                                    color: _textColorValue.value == c
                                         ? AppColors.primaryDeep
                                         : borderColor,
-                                    width: _textColorValue == c ? 3 : 1,
+                                    width: _textColorValue.value == c ? 3 : 1,
                                   ),
                                 ),
                               ),
@@ -566,101 +518,6 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                     ),
                   ],
                 ),
-
-                // This shows selected photos so the user can remove them.
-                if (_images.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 112,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _images.length,
-                      separatorBuilder: (context, i) => const SizedBox(width: 10),
-                      itemBuilder: (context, index) {
-                        final file = _images[index];
-                        final isActive = index == _activeIndex;
-                        return InkWell(
-                          onTap: () => setState(() => _activeIndex = index),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Stack(
-                            children: [
-                              FutureBuilder<Uint8List>(
-                                future: file.readAsBytes(),
-                                builder: (context, snap) {
-                                  final bytes = snap.data;
-                                  return Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(
-                                        color: isActive
-                                            ? AppColors.primaryDeep
-                                            : borderColor,
-                                        width: isActive ? 2.5 : 1,
-                                      ),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: bytes != null && bytes.isNotEmpty
-                                          ? Image.memory(
-                                              bytes,
-                                              width: 112,
-                                              height: 112,
-                                              fit: BoxFit.cover,
-                                            )
-                                          : Container(
-                                              width: 112,
-                                              height: 112,
-                                              color: isDarkMode
-                                                  ? const Color(0xFF1E1E1E)
-                                                  : AppColors.surfaceMuted,
-                                              alignment: Alignment.center,
-                                              child: const CircularProgressIndicator(strokeWidth: 2),
-                                            ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              Positioned(
-                                top: 4,
-                                right: 4,
-                                child: Material(
-                                  color: (isDarkMode
-                                          ? const Color(0xFF1E1E1E)
-                                          : Colors.white)
-                                      .withValues(alpha: 0.95),
-                                  shape: const CircleBorder(),
-                                  child: IconButton(
-                                    visualDensity: VisualDensity.compact,
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                    tooltip: 'Remove',
-                                    onPressed: _submitting
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              _images.removeAt(index);
-                                              if (_images.isEmpty) {
-                                                _activeIndex = 0;
-                                              } else {
-                                                _activeIndex = _activeIndex.clamp(0, _images.length - 1);
-                                              }
-                                            });
-                                          },
-                                    icon: Icon(
-                                      Icons.close_rounded,
-                                      size: 18,
-                                      color: isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
 
                 const SizedBox(height: 28),
                 Opacity(
@@ -773,3 +630,106 @@ class _StoryAttachmentChip extends StatelessWidget {
     );
   }
 }
+
+// This widget draws the image and the draggable story text using small rebuilds.
+class _StoryTextPreview extends StatelessWidget {
+  const _StoryTextPreview({
+    required this.size,
+    required this.imageBytes,
+    required this.text,
+    required this.textColorValue,
+    required this.textSize,
+    required this.textPos,
+  });
+
+  // This is the preview area size, so we can convert 0..1 position to pixels.
+  final Size size;
+
+  // This is the selected story image.
+  final Uint8List imageBytes;
+
+  // These notifiers control the text and style without rebuilding the whole page.
+  final ValueNotifier<String> text;
+  final ValueNotifier<int> textColorValue;
+  final ValueNotifier<double> textSize;
+  final ValueNotifier<Offset> textPos;
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      // This prevents the preview from repainting the whole screen when it changes.
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.memory(imageBytes, fit: BoxFit.cover),
+          ValueListenableBuilder<String>(
+            valueListenable: text,
+            builder: (context, t, _) {
+              final trimmed = t.trim();
+              if (trimmed.isEmpty) return const SizedBox.shrink();
+              return ValueListenableBuilder<Offset>(
+                valueListenable: textPos,
+                builder: (context, pos, __) {
+                  return ValueListenableBuilder<int>(
+                    valueListenable: textColorValue,
+                    builder: (context, colorValue, ___) {
+                      return ValueListenableBuilder<double>(
+                        valueListenable: textSize,
+                        builder: (context, fs, ____) {
+                          return Positioned(
+                            left: pos.dx.clamp(0.0, 1.0) * size.width,
+                            top: pos.dy.clamp(0.0, 1.0) * size.height,
+                            child: GestureDetector(
+                              // This allows dragging the text without calling setState on the page.
+                              onPanUpdate: (d) {
+                                final dx = d.delta.dx / size.width;
+                                final dy = d.delta.dy / size.height;
+                                final next = Offset(
+                                  (pos.dx + dx).clamp(0.0, 1.0),
+                                  (pos.dy + dy).clamp(0.0, 1.0),
+                                );
+                                textPos.value = next;
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  trimmed,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Color(colorValue),
+                                    fontSize: fs,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.2,
+                                    shadows: const [
+                                      Shadow(
+                                        offset: Offset(0, 1),
+                                        blurRadius: 6,
+                                        color: Colors.black54,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+

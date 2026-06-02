@@ -6,7 +6,6 @@ import 'dart:typed_data';
 
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/features/community/data/models/community_story.dart';
-import 'package:culinary_coach_app/features/community/data/services/community_post_image_encoding.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
@@ -42,20 +41,15 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
   final _textController = TextEditingController();
   final _textScrollController = ScrollController();
 
-  // This list holds story photos that already exist in Firestore.
-  final List<_ExistingStoryImage> _existing = [];
+  // This keeps the single story photo (it can be replaced or deleted).
+  _ExistingStoryImage? _photo;
 
-  // This list holds new photos the user adds while editing.
-  final List<XFile> _newImages = [];
-
-  // This index tells us which photo we are previewing behind the text editor.
-  int _activePhotoIndex = 0;
-
-  // These values control the story text style and position.
-  int _textColorValue = 0xFFFFFFFF;
-  double _textSize = 20;
-  double _textPosX = 0.5;
-  double _textPosY = 0.75;
+  // These notifiers update only the preview, so the screen does not flash.
+  final ValueNotifier<String> _previewText = ValueNotifier<String>('');
+  final ValueNotifier<int> _textColorValue = ValueNotifier<int>(0xFFFFFFFF);
+  final ValueNotifier<double> _textSize = ValueNotifier<double>(20);
+  final ValueNotifier<Offset> _textPos =
+      ValueNotifier<Offset>(const Offset(0.5, 0.75));
 
   bool _saving = false;
 
@@ -65,34 +59,40 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
 
     // This starts the editor with the current story text and style values.
     _textController.text = widget.story.textOverlay;
-    _textColorValue = widget.story.textColorValue;
-    _textSize = widget.story.textSize;
-    _textPosX = widget.story.textPosX;
-    _textPosY = widget.story.textPosY;
+    _textColorValue.value = widget.story.textColorValue;
+    _textSize.value = widget.story.textSize;
+    _textPos.value = Offset(widget.story.textPosX, widget.story.textPosY);
 
-    // This decodes current story photos so we can preview and edit them.
-    for (final raw in widget.story.imageBase64List) {
-      final trimmed = raw.trim();
-      if (trimmed.isEmpty) continue;
+    // This keeps the preview text in sync without rebuilding the whole page.
+    _previewText.value = _textController.text;
+    _textController.addListener(() {
+      _previewText.value = _textController.text;
+    });
+
+    // This decodes the saved story photo (we keep only one photo per story).
+    final raw = widget.story.imageBase64.trim().isNotEmpty
+        ? widget.story.imageBase64
+        : (widget.story.imageBase64List.isNotEmpty
+            ? widget.story.imageBase64List.first
+            : '');
+    if (raw.trim().isNotEmpty) {
       try {
-        final bytes = base64Decode(trimmed);
-        if (bytes.isEmpty) continue;
-        _existing.add(_ExistingStoryImage(base64: trimmed, bytes: bytes));
+        final bytes = base64Decode(raw.trim());
+        if (bytes.isNotEmpty) {
+          _photo = _ExistingStoryImage(base64: raw.trim(), bytes: bytes);
+        }
       } catch (_) {
-        // If one photo is corrupted, we skip it to keep the editor stable.
+        // If the photo is corrupted, we keep it empty so the user can add a new one.
       }
-    }
-
-    // This keeps the selected photo index within the available range.
-    if (_existing.isEmpty) {
-      _activePhotoIndex = 0;
-    } else {
-      _activePhotoIndex = _activePhotoIndex.clamp(0, _existing.length - 1);
     }
   }
 
   @override
   void dispose() {
+    _previewText.dispose();
+    _textColorValue.dispose();
+    _textSize.dispose();
+    _textPos.dispose();
     _textController.dispose();
     _textScrollController.dispose();
     super.dispose();
@@ -119,8 +119,8 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
     return true;
   }
 
-  // This adds more photos to the story (they will be encoded and saved to Firestore).
-  Future<void> _addPhotos() async {
+  // This picks a story photo if none exists yet.
+  Future<void> _addPhoto() async {
     final ok = await _ensureGalleryPermission();
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -134,13 +134,18 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
     }
 
     try {
-      final files = await _picker.pickMultiImage(
+      final file = await _picker.pickImage(
+        source: ImageSource.gallery,
         imageQuality: 88,
         maxWidth: 1600,
       );
-      if (files.isEmpty) return;
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) return;
       if (!mounted) return;
-      setState(() => _newImages.addAll(files));
+      setState(() {
+        _photo = _ExistingStoryImage(base64: base64Encode(bytes), bytes: bytes);
+      });
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -149,22 +154,13 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
     }
   }
 
-  // This removes one existing photo from the story.
-  void _removeExistingAt(int index) {
-    setState(() {
-      _existing.removeAt(index);
-      _activePhotoIndex =
-          _existing.isEmpty ? 0 : _activePhotoIndex.clamp(0, _existing.length - 1);
-    });
+  // This removes the photo that the user no longer wants in the story.
+  void _removePhoto() {
+    setState(() => _photo = null);
   }
 
-  // This removes one newly added photo before saving.
-  void _removeNewAt(int index) {
-    setState(() => _newImages.removeAt(index));
-  }
-
-  // This replaces one existing story photo with a new photo picked from the gallery.
-  Future<void> _replaceExistingAt(int index) async {
+  // This replaces the current story photo with a new one.
+  Future<void> _replacePhoto() async {
     final ok = await _ensureGalleryPermission();
     if (!ok || !mounted) return;
     try {
@@ -178,7 +174,7 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
       if (!mounted) return;
       final encoded = base64Encode(bytes);
       setState(() {
-        _existing[index] = _ExistingStoryImage(base64: encoded, bytes: bytes);
+        _photo = _ExistingStoryImage(base64: encoded, bytes: bytes);
       });
     } catch (_) {
       if (!mounted) return;
@@ -188,50 +184,22 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
     }
   }
 
-  // This updates the relative text position when the user drags the text.
-  void _applyDragDelta(Offset delta, Size size) {
-    if (size.width <= 0 || size.height <= 0) return;
-
-    // This converts pixels to 0..1 values so the position works on any screen size.
-    final dx = delta.dx / size.width;
-    final dy = delta.dy / size.height;
-
-    setState(() {
-      _textPosX = (_textPosX + dx).clamp(0.0, 1.0);
-      _textPosY = (_textPosY + dy).clamp(0.0, 1.0);
-    });
-  }
-
   // This saves the edited story photos and text style back to Firestore.
   Future<void> _save() async {
     if (_saving) return;
-    if (_existing.isEmpty && _newImages.isEmpty) {
-      // This prevents saving a story with no photos.
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please keep at least one photo.')),
-      );
-      return;
-    }
+    final base64 = _photo?.base64 ?? '';
 
     setState(() => _saving = true);
     try {
-      // This keeps the Base64 photos the user did not delete.
-      final keptBase64 = _existing.map((e) => e.base64).toList();
-
-      // This encodes new photos to Base64 so we can store them in Firestore.
-      final newBase64 = _newImages.isEmpty
-          ? <String>[]
-          : await encodeCommunityPostImagesForFirestore(_newImages);
-
       // This saves all edited fields into the same story document.
       await _repo.updateStoryFull(
         storyId: widget.story.id,
         textOverlay: _textController.text,
-        imageBase64List: [...keptBase64, ...newBase64],
-        textColorValue: _textColorValue,
-        textSize: _textSize,
-        textPosX: _textPosX,
-        textPosY: _textPosY,
+        imageBase64: base64,
+        textColorValue: _textColorValue.value,
+        textSize: _textSize.value,
+        textPosX: _textPos.value.dx,
+        textPosY: _textPos.value.dy,
       );
 
       if (!mounted) return;
@@ -260,13 +228,8 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
     final titleColor = isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
     final mutedColor = isDarkMode ? const Color(0xFF9A9A9A) : AppColors.textMuted;
 
-    // This rebuilds a Color object from the saved ARGB int.
-    final overlayColor = Color(_textColorValue);
-
     // This chooses which photo to show behind the draggable text.
-    final previewBytes = (_activePhotoIndex >= 0 && _activePhotoIndex < _existing.length)
-        ? _existing[_activePhotoIndex].bytes
-        : null;
+    final previewBytes = _photo?.bytes;
 
     return Scaffold(
       backgroundColor: pageBg,
@@ -287,49 +250,26 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final size = Size(constraints.maxWidth, constraints.maxHeight);
-                    return Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        if (previewBytes != null)
-                          Image.memory(previewBytes, fit: BoxFit.cover)
-                        else
-                          Container(color: isDarkMode ? const Color(0xFF1E1E1E) : AppColors.surfaceMuted),
-
-                        // This shows the story text at the saved position and style.
-                        if (_textController.text.trim().isNotEmpty)
-                          Positioned(
-                            left: _textPosX * size.width,
-                            top: _textPosY * size.height,
-                            child: GestureDetector(
-                              // This allows the user to drag the text anywhere on the photo.
-                              onPanUpdate: (d) => _applyDragDelta(d.delta, size),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.18),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  _textController.text,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: overlayColor,
-                                    fontSize: _textSize,
-                                    fontWeight: FontWeight.w800,
-                                    height: 1.2,
-                                    shadows: const [
-                                      Shadow(
-                                        offset: Offset(0, 1),
-                                        blurRadius: 6,
-                                        color: Colors.black54,
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                    if (previewBytes == null) {
+                      return Container(
+                        color: isDarkMode ? const Color(0xFF1E1E1E) : AppColors.surfaceMuted,
+                        alignment: Alignment.center,
+                        child: Text(
+                          'No photo selected',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: mutedColor,
+                                fontWeight: FontWeight.w700,
                               ),
-                            ),
-                          ),
-                      ],
+                        ),
+                      );
+                    }
+                    return _StoryTextPreview(
+                      size: size,
+                      imageBytes: previewBytes,
+                      text: _previewText,
+                      textColorValue: _textColorValue,
+                      textSize: _textSize,
+                      textPos: _textPos,
                     );
                   },
                 ),
@@ -390,11 +330,11 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
                         ),
                   ),
                   Slider(
-                    value: _textSize.clamp(12.0, 44.0),
+                    value: _textSize.value.clamp(12.0, 44.0),
                     min: 12,
                     max: 44,
                     activeColor: AppColors.primaryDeep,
-                    onChanged: _saving ? null : (v) => setState(() => _textSize = v),
+                    onChanged: _saving ? null : (v) => _textSize.value = v,
                   ),
                 ],
               ),
@@ -433,7 +373,7 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
                         0xFF000000,
                       ])
                         InkWell(
-                          onTap: _saving ? null : () => setState(() => _textColorValue = c),
+                          onTap: _saving ? null : () => _textColorValue.value = c,
                           borderRadius: BorderRadius.circular(999),
                           child: Container(
                             height: 34,
@@ -442,10 +382,10 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
                               shape: BoxShape.circle,
                               color: Color(c),
                               border: Border.all(
-                                color: _textColorValue == c
+                                color: _textColorValue.value == c
                                     ? AppColors.primaryDeep
                                     : borderColor,
-                                width: _textColorValue == c ? 3 : 1,
+                                width: _textColorValue.value == c ? 3 : 1,
                               ),
                             ),
                           ),
@@ -457,14 +397,14 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
             ),
             const SizedBox(height: 14),
 
-            // This button adds more photos to the story.
+            // This button lets the user add a photo if none exists.
             SizedBox(
               height: 48,
               child: OutlinedButton.icon(
-                onPressed: _saving ? null : _addPhotos,
+                onPressed: _saving ? null : _addPhoto,
                 icon: const Icon(Icons.photo_library_rounded, color: AppColors.primaryDeep),
                 label: Text(
-                  'Add Photos',
+                  'Add Photo',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: titleColor,
@@ -477,117 +417,47 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
               ),
             ),
 
-            if (_existing.isNotEmpty || _newImages.isNotEmpty) ...[
+            // This shows quick actions for the single story photo.
+            if (_photo != null) ...[
               const SizedBox(height: 14),
-              // This shows existing and new photos so the user can remove or replace them.
-              SizedBox(
-                height: 112,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _existing.length + _newImages.length,
-                  separatorBuilder: (context, i) => const SizedBox(width: 10),
-                  itemBuilder: (context, index) {
-                    final isExisting = index < _existing.length;
-
-                    // This renders the correct thumbnail type (existing vs new).
-                    Widget thumb;
-                    VoidCallback onRemove;
-                    VoidCallback? onReplace;
-                    if (isExisting) {
-                      final img = _existing[index];
-                      thumb = Image.memory(img.bytes, width: 112, height: 112, fit: BoxFit.cover);
-                      onRemove = () => _removeExistingAt(index);
-                      onReplace = () => _replaceExistingAt(index);
-                    } else {
-                      final ni = index - _existing.length;
-                      final file = _newImages[ni];
-                      thumb = FutureBuilder<Uint8List>(
-                        future: file.readAsBytes(),
-                        builder: (context, snap) {
-                          final bytes = snap.data;
-                          if (bytes == null || bytes.isEmpty) {
-                            return Container(
-                              width: 112,
-                              height: 112,
-                              color: isDarkMode ? const Color(0xFF1E1E1E) : AppColors.surfaceMuted,
-                              alignment: Alignment.center,
-                              child: const CircularProgressIndicator(strokeWidth: 2),
-                            );
-                          }
-                          return Image.memory(bytes, width: 112, height: 112, fit: BoxFit.cover);
-                        },
-                      );
-                      onRemove = () => _removeNewAt(ni);
-                      onReplace = null;
-                    }
-
-                    // This highlights the photo that is currently used in the preview.
-                    final isActive = isExisting && index == _activePhotoIndex;
-
-                    return InkWell(
-                      onTap: isExisting
-                          ? () => setState(() => _activePhotoIndex = index)
-                          : null,
-                      borderRadius: BorderRadius.circular(16),
-                      child: Stack(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isActive ? AppColors.primaryDeep : borderColor,
-                                width: isActive ? 2.5 : 1,
-                              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _saving ? null : _replacePhoto,
+                      icon: const Icon(Icons.swap_horiz_rounded, color: AppColors.primaryDeep),
+                      label: Text(
+                        'Replace photo',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: titleColor,
                             ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: thumb,
-                            ),
-                          ),
-                          if (onReplace != null)
-                            Positioned(
-                              bottom: 4,
-                              left: 4,
-                              child: Material(
-                                color: (isDarkMode ? const Color(0xFF1E1E1E) : Colors.white)
-                                    .withValues(alpha: 0.92),
-                                borderRadius: BorderRadius.circular(999),
-                                child: InkWell(
-                                  onTap: _saving ? null : onReplace,
-                                  borderRadius: BorderRadius.circular(999),
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    child: Icon(Icons.swap_horiz_rounded, size: 18, color: AppColors.primaryDeep),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: Material(
-                              color: (isDarkMode ? const Color(0xFF1E1E1E) : Colors.white)
-                                  .withValues(alpha: 0.95),
-                              shape: const CircleBorder(),
-                              child: IconButton(
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                tooltip: 'Remove',
-                                onPressed: _saving ? null : onRemove,
-                                icon: Icon(
-                                  Icons.close_rounded,
-                                  size: 18,
-                                  color: isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
-                    );
-                  },
-                ),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: borderColor),
+                        backgroundColor: cardColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _saving ? null : _removePhoto,
+                      icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFB3261E)),
+                      label: Text(
+                        'Delete photo',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: titleColor,
+                            ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: borderColor),
+                        backgroundColor: cardColor,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
 
@@ -614,4 +484,107 @@ class _EditStoryScreenState extends State<EditStoryScreen> {
     );
   }
 }
+
+// This widget draws the story preview using small rebuilds.
+class _StoryTextPreview extends StatelessWidget {
+  const _StoryTextPreview({
+    required this.size,
+    required this.imageBytes,
+    required this.text,
+    required this.textColorValue,
+    required this.textSize,
+    required this.textPos,
+  });
+
+  // This is the preview area size, so we can convert 0..1 position to pixels.
+  final Size size;
+
+  // This is the selected story image.
+  final Uint8List imageBytes;
+
+  // These notifiers control the text and style without rebuilding the whole page.
+  final ValueNotifier<String> text;
+  final ValueNotifier<int> textColorValue;
+  final ValueNotifier<double> textSize;
+  final ValueNotifier<Offset> textPos;
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      // This prevents the preview from repainting the whole screen when it changes.
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.memory(imageBytes, fit: BoxFit.cover),
+          ValueListenableBuilder<String>(
+            valueListenable: text,
+            builder: (context, t, _) {
+              final trimmed = t.trim();
+              if (trimmed.isEmpty) return const SizedBox.shrink();
+              return ValueListenableBuilder<Offset>(
+                valueListenable: textPos,
+                builder: (context, pos, __) {
+                  return ValueListenableBuilder<int>(
+                    valueListenable: textColorValue,
+                    builder: (context, colorValue, ___) {
+                      return ValueListenableBuilder<double>(
+                        valueListenable: textSize,
+                        builder: (context, fs, ____) {
+                          return Positioned(
+                            left: pos.dx.clamp(0.0, 1.0) * size.width,
+                            top: pos.dy.clamp(0.0, 1.0) * size.height,
+                            child: GestureDetector(
+                              // This allows dragging the text without calling setState on the page.
+                              onPanUpdate: (d) {
+                                final dx = d.delta.dx / size.width;
+                                final dy = d.delta.dy / size.height;
+                                final next = Offset(
+                                  (pos.dx + dx).clamp(0.0, 1.0),
+                                  (pos.dy + dy).clamp(0.0, 1.0),
+                                );
+                                textPos.value = next;
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  trimmed,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Color(colorValue),
+                                    fontSize: fs,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.2,
+                                    shadows: const [
+                                      Shadow(
+                                        offset: Offset(0, 1),
+                                        blurRadius: 6,
+                                        color: Colors.black54,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 

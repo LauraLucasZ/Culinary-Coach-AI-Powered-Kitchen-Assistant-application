@@ -338,12 +338,12 @@ class _StorySlide extends StatelessWidget {
           );
         }
 
-        // This reads all story photos, but we still handle old stories with a single image.
-        final images = story.imageBase64List.isNotEmpty
-            ? story.imageBase64List
-            : (story.imageBase64.trim().isNotEmpty ? [story.imageBase64] : const <String>[]);
-        // This is the first decoded photo; we keep it as a quick existence check.
-        final firstBytes = _decode(images.isNotEmpty ? images.first : story.imageBase64);
+        // This story uses one photo, but we still accept older docs that might have a list.
+        final base64 = story.imageBase64.trim().isNotEmpty
+            ? story.imageBase64
+            : (story.imageBase64List.isNotEmpty ? story.imageBase64List.first : '');
+        // This decodes the story photo so we can render it.
+        final bytes = _decode(base64);
         final liked = story.likedByUid(viewer?.uid);
         final count = story.likeCount;
         final isOwner = (viewer?.uid ?? '').trim() == story.userId.trim();
@@ -354,19 +354,12 @@ class _StorySlide extends StatelessWidget {
         return Stack(
           fit: StackFit.expand,
           children: [
-            // This shows the story photo(s). If there are multiple photos, the user can swipe.
-            if (images.isNotEmpty && firstBytes != null)
-              PageView.builder(
-                itemCount: images.length,
-                itemBuilder: (context, i) {
-                  final b = _decode(images[i]);
-                  if (b == null) return Container(color: AppColors.darkPanel);
-                  return Image.memory(
-                    b,
-                    fit: BoxFit.cover,
-                    gaplessPlayback: true,
-                  );
-                },
+            // This shows the story photo, or a dark panel if the photo was deleted.
+            if (bytes != null)
+              Image.memory(
+                bytes,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
               )
             else
               Container(color: AppColors.darkPanel),
