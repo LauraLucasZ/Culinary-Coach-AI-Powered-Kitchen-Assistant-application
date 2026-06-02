@@ -380,6 +380,178 @@ class _StorySlide extends StatelessWidget {
                           icon: const Icon(Icons.close_rounded, color: Colors.white),
                         ),
                         const Spacer(),
+                        if (isOwner)
+                          PopupMenuButton<String>(
+                            tooltip: 'Story options',
+                            icon: const Icon(
+                              Icons.more_horiz_rounded,
+                              color: Colors.white,
+                            ),
+                            color: const Color(0xFF2C2C2C),
+                            surfaceTintColor: Colors.transparent,
+                            onSelected: (v) async {
+                              if (v == 'edit') {
+                                final controller =
+                                    TextEditingController(text: story.textOverlay);
+                                final newText = await showDialog<String>(
+                                  context: context,
+                                  builder: (ctx) {
+                                    return AlertDialog(
+                                      backgroundColor: const Color(0xFF2C2C2C),
+                                      surfaceTintColor: Colors.transparent,
+                                      title: const Text(
+                                        'Edit Story',
+                                        style: TextStyle(
+                                          color: Color(0xFFF2F2F2),
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      content: TextField(
+                                        controller: controller,
+                                        minLines: 2,
+                                        maxLines: 6,
+                                        cursorColor: AppColors.primaryDeep,
+                                        decoration: InputDecoration(
+                                          hintText: 'Update your story...',
+                                          hintStyle: const TextStyle(
+                                            color: Color(0xFF9A9A9A),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          filled: true,
+                                          fillColor: const Color(0xFF1E1E1E),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: const BorderSide(
+                                              color: Color(0xFF444444),
+                                            ),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(14),
+                                            borderSide: const BorderSide(
+                                              color: AppColors.primaryDeep,
+                                            ),
+                                          ),
+                                        ),
+                                        style: const TextStyle(
+                                          color: Color(0xFFF2F2F2),
+                                          fontWeight: FontWeight.w600,
+                                          height: 1.35,
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(ctx).pop(),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(ctx).pop(controller.text),
+                                          child: const Text('Save'),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                                if (newText == null) return;
+                                try {
+                                  await repo.updateStoryTextOverlay(
+                                    storyId: story.id,
+                                    textOverlay: newText,
+                                  );
+                                } catch (_) {}
+                              }
+                              if (v == 'delete') {
+                                final ok = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) {
+                                    return AlertDialog(
+                                      backgroundColor: const Color(0xFF2C2C2C),
+                                      surfaceTintColor: Colors.transparent,
+                                      title: const Text(
+                                        'Delete Story?',
+                                        style: TextStyle(
+                                          color: Color(0xFFF2F2F2),
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      content: const Text(
+                                        'This will permanently delete your story.',
+                                        style: TextStyle(
+                                          color: Color(0xFFBFBFBF),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(ctx).pop(false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(ctx).pop(true),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor:
+                                                const Color(0xFFFF6B6B),
+                                          ),
+                                          child: const Text('Delete'),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                                if (ok != true) return;
+                                try {
+                                  await repo.deleteStory(storyId: story.id);
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                  }
+                                } catch (_) {}
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem<String>(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.edit_rounded,
+                                      color: AppColors.primaryDeep,
+                                      size: 18,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Edit Story',
+                                      style: TextStyle(
+                                        color: Color(0xFFF2F2F2),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem<String>(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.delete_outline_rounded,
+                                      color: Color(0xFFFF6B6B),
+                                      size: 18,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Delete Story',
+                                      style: TextStyle(
+                                        color: Color(0xFFF2F2F2),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                     Row(

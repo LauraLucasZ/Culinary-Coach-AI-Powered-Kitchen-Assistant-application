@@ -154,8 +154,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     }
 
     final isGoogle = _isGoogleUser(user);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final pageBg =
+        isDarkMode ? const Color(0xFF121212) : AppColors.background;
 
     return Scaffold(
+      backgroundColor: pageBg,
       appBar: AppBar(title: const Text('Change Password')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
@@ -229,15 +233,24 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final cardColor =
+        isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final titleColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+    final shadow =
+        Colors.black.withValues(alpha: isDarkMode ? 0.24 : 0.07);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textPrimary.withValues(alpha: 0.07),
+            color: shadow,
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -250,7 +263,7 @@ class _SectionCard extends StatelessWidget {
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: titleColor,
                 ),
           ),
           const SizedBox(height: 12),
@@ -276,12 +289,21 @@ class _PasswordField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final rowBg =
+        isDarkMode ? const Color(0xFF1E1E1E) : AppColors.surfaceMuted;
+    final hintColor =
+        isDarkMode ? const Color(0xFF9A9A9A) : AppColors.textMuted;
+    final textColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
+        color: rowBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
@@ -295,6 +317,10 @@ class _PasswordField extends StatelessWidget {
               autocorrect: false,
               decoration: InputDecoration(
                 hintText: label,
+                hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: hintColor,
+                      fontWeight: FontWeight.w600,
+                    ),
                 isDense: true,
                 filled: false,
                 border: InputBorder.none,
@@ -302,13 +328,17 @@ class _PasswordField extends StatelessWidget {
                 focusedBorder: InputBorder.none,
                 contentPadding: EdgeInsets.zero,
               ),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: textColor,
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
           ),
           IconButton(
             onPressed: onToggle,
             icon: Icon(
               obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded,
-              color: AppColors.textMuted,
+              color: hintColor,
               size: 20,
             ),
             splashRadius: 18,

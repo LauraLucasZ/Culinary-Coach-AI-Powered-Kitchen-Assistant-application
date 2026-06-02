@@ -58,6 +58,99 @@ class CommunityPostCard extends StatelessWidget {
             authorName: post.authorName,
             authorProfileImageUrl: post.authorProfileImageUrl,
             createdAt: post.createdAt,
+            isOwner: (currentUid ?? '').trim().isNotEmpty &&
+                (currentUid ?? '').trim() == post.authorId.trim(),
+            onEdit: () async {
+              final initial = post.caption;
+              final controller = TextEditingController(text: initial);
+              final newText = await showDialog<String>(
+                context: context,
+                builder: (ctx) {
+                  final isDark = Theme.of(ctx).brightness == Brightness.dark;
+                  final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+                  final border = isDark ? const Color(0xFF444444) : AppColors.outline;
+                  final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+                  final hint = isDark ? const Color(0xFF9A9A9A) : AppColors.textMuted;
+                  return AlertDialog(
+                    backgroundColor: bg,
+                    surfaceTintColor: Colors.transparent,
+                    title: Text('Edit Post', style: TextStyle(color: title, fontWeight: FontWeight.w800)),
+                    content: TextField(
+                      controller: controller,
+                      minLines: 3,
+                      maxLines: 8,
+                      cursorColor: AppColors.primaryDeep,
+                      decoration: InputDecoration(
+                        hintText: 'Update your post...',
+                        hintStyle: TextStyle(color: hint, fontWeight: FontWeight.w600),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF1E1E1E) : AppColors.surfaceMuted,
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(color: border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppColors.primaryDeep),
+                        ),
+                      ),
+                      style: TextStyle(color: title, fontWeight: FontWeight.w600, height: 1.35),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(controller.text),
+                        child: const Text('Save'),
+                      ),
+                    ],
+                  );
+                },
+              );
+              if (newText == null) return;
+              try {
+                await repo.updatePostCaption(postId: post.id, caption: newText);
+              } catch (_) {}
+            },
+            onDelete: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (ctx) {
+                  final isDark = Theme.of(ctx).brightness == Brightness.dark;
+                  final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+                  final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+                  final secondary = isDark ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+                  return AlertDialog(
+                    backgroundColor: bg,
+                    surfaceTintColor: Colors.transparent,
+                    title: Text('Delete Post?', style: TextStyle(color: title, fontWeight: FontWeight.w800)),
+                    content: Text(
+                      'This will permanently delete your post.',
+                      style: TextStyle(color: secondary, fontWeight: FontWeight.w600),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFFB3261E),
+                        ),
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  );
+                },
+              );
+              if (ok != true) return;
+              try {
+                await repo.deletePost(postId: post.id);
+              } catch (_) {}
+            },
             onAuthorTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -368,6 +461,9 @@ class _HeaderRow extends StatelessWidget {
     required this.authorProfileImageUrl,
     required this.createdAt,
     required this.onAuthorTap,
+    required this.isOwner,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   final String authorId;
@@ -375,6 +471,9 @@ class _HeaderRow extends StatelessWidget {
   final String? authorProfileImageUrl;
   final DateTime createdAt;
   final VoidCallback onAuthorTap;
+  final bool isOwner;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -428,6 +527,54 @@ class _HeaderRow extends StatelessWidget {
             ),
           ),
         ),
+        if (isOwner)
+          PopupMenuButton<String>(
+            tooltip: 'Post options',
+            icon: Icon(
+              Icons.more_horiz_rounded,
+              color: isDarkMode ? Colors.white70 : AppColors.textMuted,
+            ),
+            color: isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+            surfaceTintColor: Colors.transparent,
+            onSelected: (v) {
+              if (v == 'edit') onEdit();
+              if (v == 'delete') onDelete();
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem<String>(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    const Icon(Icons.edit_rounded, color: AppColors.primaryDeep, size: 18),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Edit Post',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: titleColor,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete_outline_rounded, color: Color(0xFFB3261E), size: 18),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Delete Post',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: titleColor,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }

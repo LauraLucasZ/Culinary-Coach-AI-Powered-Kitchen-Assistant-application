@@ -31,8 +31,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     final repo = CommunityRepository();
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final pageBg =
+        isDarkMode ? const Color(0xFF121212) : AppColors.background;
+    final cardColor =
+        isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final titleColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+    final secondaryColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+    final mutedColor =
+        isDarkMode ? const Color(0xFF9A9A9A) : AppColors.textMuted;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: pageBg,
       appBar: AppBar(title: const Text('Notifications')),
       body: StreamBuilder(
         // Live notifications for the signed-in user from Firestore.
@@ -46,14 +59,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             );
           }
           if (items.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
                   'No notifications yet.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: AppColors.textSecondary,
+                    color: secondaryColor,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -82,12 +95,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardColor,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: AppColors.outline),
+                    border: Border.all(color: borderColor),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.textPrimary.withValues(alpha: 0.06),
+                        color: Colors.black.withValues(alpha: isDarkMode ? 0.24 : 0.06),
                         blurRadius: 16,
                         offset: const Offset(0, 10),
                       ),
@@ -113,7 +126,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   .textTheme
                                   .bodyLarge
                                   ?.copyWith(
-                                    color: AppColors.textPrimary,
+                                    color: titleColor,
                                     fontWeight: FontWeight.w700,
                                     height: 1.25,
                                   ),
@@ -125,7 +138,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   .textTheme
                                   .labelMedium
                                   ?.copyWith(
-                                    color: AppColors.textMuted,
+                                    color: mutedColor,
                                     fontWeight: FontWeight.w600,
                                   ),
                             ),
@@ -133,9 +146,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      const Icon(
+                      Icon(
                         Icons.chevron_right_rounded,
-                        color: AppColors.textMuted,
+                        color: mutedColor,
                       ),
                     ],
                   ),

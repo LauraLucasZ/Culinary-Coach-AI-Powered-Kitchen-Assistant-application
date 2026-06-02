@@ -183,6 +183,19 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final pageBg =
+        isDarkMode ? const Color(0xFF121212) : AppColors.background;
+    final cardColor =
+        isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final titleColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+    final secondaryColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+    final mutedColor =
+        isDarkMode ? const Color(0xFF9A9A9A) : AppColors.textMuted;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       return Scaffold(
@@ -204,20 +217,20 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: pageBg,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: pageBg,
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_rounded, color: titleColor),
           onPressed: _submitting ? null : () => Navigator.of(context).maybePop(),
         ),
         title: Text(
           'New Story',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
+                color: titleColor,
               ),
         ),
         centerTitle: true,
@@ -241,19 +254,22 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                 Container(
                   padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFFFE8C4),
-                        Color(0xFFFFF6E8),
-                      ],
-                    ),
+                    gradient: isDarkMode
+                        ? null
+                        : const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFFFFE8C4),
+                              Color(0xFFFFF6E8),
+                            ],
+                          ),
+                    color: isDarkMode ? cardColor : null,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: AppColors.outline),
+                    border: Border.all(color: borderColor),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.textPrimary.withValues(alpha: 0.06),
+                        color: Colors.black.withValues(alpha: isDarkMode ? 0.24 : 0.06),
                         blurRadius: 16,
                         offset: const Offset(0, 8),
                       ),
@@ -263,7 +279,8 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                     children: [
                       CurrentUserAvatar(
                         size: 48,
-                        backgroundColor: const Color(0xFFD28E18),
+                        backgroundColor:
+                            isDarkMode ? const Color(0xFF444444) : const Color(0xFFD28E18),
                         borderColor: Colors.white.withValues(alpha: 0.65),
                         borderWidth: 2,
                       ),
@@ -275,7 +292,7 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
+                                color: titleColor,
                               ),
                         ),
                       ),
@@ -326,15 +343,15 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                     height: 280,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceMuted,
+                      color: isDarkMode ? const Color(0xFF1E1E1E) : AppColors.surfaceMuted,
                       borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: AppColors.outline),
+                      border: Border.all(color: borderColor),
                     ),
                     child: Text(
                       'Add a photo to preview your story',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: AppColors.textSecondary,
+                            color: secondaryColor,
                             fontWeight: FontWeight.w600,
                           ),
                     ),
@@ -343,9 +360,9 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                 Container(
                   padding: const EdgeInsets.fromLTRB(8, 10, 8, 12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardColor,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: AppColors.outline),
+                    border: Border.all(color: borderColor),
                   ),
                   child: TextField(
                     controller: _overlayController,
@@ -356,14 +373,14 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
                     textCapitalization: TextCapitalization.sentences,
                     enabled: !_submitting,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppColors.textPrimary,
+                          color: titleColor,
                           fontWeight: FontWeight.w600,
                           height: 1.45,
                         ),
                     decoration: InputDecoration(
                       hintText: 'Write on your story (text & emojis)',
                       hintStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: AppColors.textMuted,
+                            color: mutedColor,
                             fontWeight: FontWeight.w600,
                           ),
                       border: InputBorder.none,
@@ -479,8 +496,15 @@ class _StoryAttachmentChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final cardColor =
+        isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final titleColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
     return Material(
-      color: Colors.white,
+      color: cardColor,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -489,7 +513,7 @@ class _StoryAttachmentChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.outline),
+            border: Border.all(color: borderColor),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -500,7 +524,7 @@ class _StoryAttachmentChip extends StatelessWidget {
                 label,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                      color: titleColor,
                     ),
               ),
             ],

@@ -317,6 +317,48 @@ class CommunityRepository {
     return postRef.id;
   }
 
+  Future<void> updatePostCaption({
+    required String postId,
+    required String caption,
+  }) async {
+    final viewer = _requireUser;
+    final postRef = postsCol().doc(postId);
+    final now = Timestamp.now();
+    final trimmed = caption.trim();
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(postRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final authorId = (data['authorId'] as String?)?.trim() ?? '';
+      if (authorId.isEmpty || authorId != viewer.uid) return;
+      tx.update(postRef, {
+        'caption': trimmed,
+        'updatedAt': now,
+      });
+    });
+  }
+
+  Future<void> deletePost({required String postId}) async {
+    final viewer = _requireUser;
+    final postRef = postsCol().doc(postId);
+    final now = Timestamp.now();
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(postRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final authorId = (data['authorId'] as String?)?.trim() ?? '';
+      if (authorId.isEmpty || authorId != viewer.uid) return;
+      tx.delete(postRef);
+      tx.set(
+        userDoc(viewer.uid),
+        {'communityPosts': FieldValue.increment(-1), 'updatedAt': now},
+        SetOptions(merge: true),
+      );
+    });
+  }
+
   Query<Map<String, dynamic>> queryPostsForUser(String uid) {
     // Avoid composite-index requirements (authorId + createdAt).
     // We'll sort client-side by createdAt for stability.
@@ -1085,6 +1127,42 @@ class CommunityRepository {
           });
         }
       }
+    });
+  }
+
+  Future<void> updateStoryTextOverlay({
+    required String storyId,
+    required String textOverlay,
+  }) async {
+    final viewer = _requireUser;
+    final storyRef = storiesCol().doc(storyId);
+    final now = Timestamp.now();
+    final trimmed = textOverlay.trim();
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(storyRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final ownerId = (data['userId'] as String?)?.trim() ?? '';
+      if (ownerId.isEmpty || ownerId != viewer.uid) return;
+      tx.update(storyRef, {
+        'textOverlay': trimmed,
+        'updatedAt': now,
+      });
+    });
+  }
+
+  Future<void> deleteStory({required String storyId}) async {
+    final viewer = _requireUser;
+    final storyRef = storiesCol().doc(storyId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(storyRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final ownerId = (data['userId'] as String?)?.trim() ?? '';
+      if (ownerId.isEmpty || ownerId != viewer.uid) return;
+      tx.delete(storyRef);
     });
   }
 }
