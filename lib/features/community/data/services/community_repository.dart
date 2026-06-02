@@ -196,7 +196,7 @@ class CommunityRepository {
         SetOptions(merge: true),
       );
 
-      final notifRef = notificationsCol(targetUid).doc();
+      final notifRef = notificationsCol(targetUid).doc('follow_$viewerUid');
       tx.set(notifRef, {
         'type': 'follow',
         'fromUid': viewerUid,
@@ -205,6 +205,8 @@ class CommunityRepository {
         'message': '$viewerName started following you.',
         'createdAt': now,
         'read': false,
+        'recipientUserId': targetUid,
+        'senderUserId': viewerUid,
       });
     });
   }
@@ -220,12 +222,15 @@ class CommunityRepository {
     await _firestore.runTransaction((tx) async {
       final followingRef = followingCol(viewerUid).doc(targetUid);
       final followerRef = followersCol(targetUid).doc(viewerUid);
+      final notifRef = notificationsCol(targetUid).doc('follow_$viewerUid');
 
       final existing = await tx.get(followingRef);
       if (!existing.exists) return;
 
       tx.delete(followingRef);
       tx.delete(followerRef);
+      // This removes the notification because the action was undone.
+      tx.delete(notifRef);
 
       tx.set(
         userDoc(targetUid),
@@ -366,26 +371,27 @@ class CommunityRepository {
 
     var originalId = '';
     var originalAuthorId = '';
+    var repostTargetId = '';
 
     await _firestore.runTransaction((tx) async {
       final repostSnap = await tx.get(repostRef);
       if (!repostSnap.exists) return;
       final data = repostSnap.data() ?? const <String, dynamic>{};
 
-      // Student note: user can delete only posts they own.
+      // Only the repost owner can delete this document.
       final authorId = (data['authorId'] as String?)?.trim() ?? '';
       if (authorId.isEmpty || authorId != viewer.uid) return;
 
-      // Student note: reposts have `repostOfPostId`; originals don't.
+      // Repost documents store a reference to the original post id.
       originalId = (data['repostOfPostId'] as String?)?.trim() ?? '';
       originalAuthorId = (data['originalAuthorId'] as String?)?.trim() ?? '';
-      if (originalId.isEmpty) return; // Not a repost → don't delete from "delete repost".
+      repostTargetId = (data['repostTargetPostId'] as String?)?.trim() ?? '';
+      if (originalId.isEmpty) return;
 
-      // Student note: this is a repost, so we remove the repost copy only.
-      // The original post should stay.
+      // This removes only the repost and keeps the original post.
       tx.delete(repostRef);
 
-      // Important: do NOT decrement `communityPosts` here (reposts never increment it).
+      // Reposts do not count toward communityPosts, so we skip that counter.
       tx.set(
         userDoc(viewer.uid),
         {'updatedAt': now},
@@ -393,15 +399,14 @@ class CommunityRepository {
       );
     });
 
-    // Student note: after deleting, the feed StreamBuilder refreshes automatically
-    // because Firestore emits a new snapshot without the repost document.
+    // The feed updates when Firestore drops the repost from the snapshot.
 
-    // Best-effort: update repost count + notification; if rules block it, the repost
-    // should still be deleted from the feed (the original post stays).
-    if (originalId.isNotEmpty) {
+    // Update repost count and notification when permitted by security rules.
+    final decrementTarget = repostTargetId.isNotEmpty ? repostTargetId : originalId;
+    if (decrementTarget.isNotEmpty) {
       try {
         await postsCol()
-            .doc(originalId)
+            .doc(decrementTarget)
             .update({'repostCount': FieldValue.increment(-1)});
       } catch (_) {}
     }
@@ -461,8 +466,8 @@ class CommunityRepository {
   }
 
   /// Returns a query for the first "page" of feed posts.
-  /// Note: uses whereIn with chunking limit 30 internally by returning multiple queries,
-  /// but for simplicity in UI we provide a single "combined stream" method.
+  /// Uses whereIn with chunking (limit 30) via multiple queries,
+  /// exposed as one combined stream for the feed UI.
   // watchFeedPosts: Stream queries posts collection — UI StreamBuilder rebuilds on changes.
   Stream<List<CommunityPost>> watchFeedPosts({bool includeMyPosts = true}) {
     final viewer = _requireUser;
@@ -736,12 +741,14 @@ class CommunityRepository {
       });
       tx.update(postRef, {'commentCount': FieldValue.increment(1)});
       if (postAuthorId.isNotEmpty && postAuthorId != viewer.uid) {
-        final notifRef = notificationsCol(postAuthorId).doc();
+        final notifRef = notificationsCol(postAuthorId)
+            .doc('comment_${postId}_${commentRef.id}_${viewer.uid}');
         tx.set(notifRef, {
           'type': 'comment',
           'recipientUserId': postAuthorId,
           'senderUserId': viewer.uid,
           'postId': postId,
+          'commentId': commentRef.id,
           'fromUid': viewer.uid,
           'fromName': senderName,
           'fromProfileImageUrl': senderProfileUrl,
@@ -783,6 +790,58 @@ class CommunityRepository {
     });
   }
 
+  Future<void> updateCommentText({
+    required String postId,
+    required String commentId,
+    required String text,
+  }) async {
+    final viewer = _requireUser;
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    final ref = postsCol().doc(postId).collection('comments').doc(commentId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final ownerUid = (data['uid'] as String?)?.trim() ?? '';
+      // This checks if the current user owns the comment.
+      if (ownerUid.isEmpty || ownerUid != viewer.uid) return;
+      // This saves the edited comment text.
+      tx.update(ref, {'text': trimmed});
+    });
+  }
+
+  Future<void> deleteComment({
+    required String postId,
+    required String commentId,
+  }) async {
+    final viewer = _requireUser;
+    final postRef = postsCol().doc(postId);
+    final ref = postRef.collection('comments').doc(commentId);
+
+    await _firestore.runTransaction((tx) async {
+      final postSnap = await tx.get(postRef);
+      final snap = await tx.get(ref);
+      if (!snap.exists || !postSnap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final ownerUid = (data['uid'] as String?)?.trim() ?? '';
+      // This checks if the current user owns the comment.
+      if (ownerUid.isEmpty || ownerUid != viewer.uid) return;
+      final postAuthorId =
+          (postSnap.data()!['authorId'] as String?)?.trim() ?? '';
+      // This removes the comment (its nested replies are removed with it).
+      tx.delete(ref);
+      tx.update(postRef, {'commentCount': FieldValue.increment(-1)});
+      if (postAuthorId.isNotEmpty && postAuthorId != viewer.uid) {
+        final notifRef = notificationsCol(postAuthorId)
+            .doc('comment_${postId}_${commentId}_${viewer.uid}');
+        // This makes sure only the matching notification is deleted.
+        tx.delete(notifRef);
+      }
+    });
+  }
+
   Future<void> addReply({
     required String postId,
     required String commentId,
@@ -811,31 +870,98 @@ class CommunityRepository {
         viewerData?.displayName ?? (viewer.displayName ?? 'User');
     final senderProfileUrl = viewerData?.profileImageUrl ?? viewer.photoURL;
     await _firestore.runTransaction((tx) async {
-      final postSnap = await tx.get(postRef);
       final snap = await tx.get(ref);
-      if (!postSnap.exists || !snap.exists) return;
-      final postAuthorId =
-          (postSnap.data()!['authorId'] as String?)?.trim() ?? '';
+      if (!snap.exists) return;
       final data = snap.data() ?? {};
       final existing = CommunityReply.listFromField(data['replies']);
       final merged = [...existing, reply];
       tx.update(ref, {
         'replies': merged.map((e) => e.toFirestore()).toList(),
       });
-      if (postAuthorId.isNotEmpty && postAuthorId != viewer.uid) {
-        final notifRef = notificationsCol(postAuthorId).doc();
+
+      final commentOwnerId = (data['uid'] as String?)?.trim() ?? '';
+      // This notifies the comment owner when someone replies.
+      if (commentOwnerId.isNotEmpty && commentOwnerId != viewer.uid) {
+        final notifRef = notificationsCol(commentOwnerId)
+            .doc('reply_${postId}_${commentId}_${replyId}_${viewer.uid}');
         tx.set(notifRef, {
           'type': 'reply',
-          'recipientUserId': postAuthorId,
+          'recipientUserId': commentOwnerId,
           'senderUserId': viewer.uid,
           'postId': postId,
+          'commentId': commentId,
+          'replyId': replyId,
           'fromUid': viewer.uid,
           'fromName': senderName,
           'fromProfileImageUrl': senderProfileUrl,
-          'message': '$senderName replied to a comment on your post',
+          'message': '$senderName replied to your comment',
           'createdAt': now,
           'read': false,
         });
+      }
+    });
+  }
+
+  Future<void> updateReplyText({
+    required String postId,
+    required String commentId,
+    required String replyId,
+    required String text,
+  }) async {
+    final viewer = _requireUser;
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    final ref = postsCol().doc(postId).collection('comments').doc(commentId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final replies = CommunityReply.listFromField(data['replies']);
+      final idx = replies.indexWhere((r) => r.id == replyId);
+      if (idx < 0) return;
+
+      final r = replies[idx];
+      // This checks if the current user owns the reply.
+      if (r.userId.trim().isEmpty || r.userId.trim() != viewer.uid) return;
+
+      final updated = [...replies];
+      // This saves the edited reply text.
+      updated[idx] = r.copyWith(text: trimmed);
+      tx.update(ref, {'replies': updated.map((e) => e.toFirestore()).toList()});
+    });
+  }
+
+  Future<void> deleteReply({
+    required String postId,
+    required String commentId,
+    required String replyId,
+  }) async {
+    final viewer = _requireUser;
+    final ref = postsCol().doc(postId).collection('comments').doc(commentId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final replies = CommunityReply.listFromField(data['replies']);
+      final idx = replies.indexWhere((r) => r.id == replyId);
+      if (idx < 0) return;
+
+      final r = replies[idx];
+      // This checks if the current user owns the reply.
+      if (r.userId.trim().isEmpty || r.userId.trim() != viewer.uid) return;
+
+      final updated = [...replies]..removeAt(idx);
+      // This removes the reply after the user confirms.
+      tx.update(ref, {'replies': updated.map((e) => e.toFirestore()).toList()});
+
+      final commentOwnerId = (data['uid'] as String?)?.trim() ?? '';
+      if (commentOwnerId.isNotEmpty && commentOwnerId != viewer.uid) {
+        final notifRef = notificationsCol(commentOwnerId)
+            .doc('reply_${postId}_${commentId}_${replyId}_${viewer.uid}');
+        // This removes the notification because the action was undone.
+        tx.delete(notifRef);
       }
     });
   }
@@ -887,48 +1013,66 @@ class CommunityRepository {
     final reposterProfileUrl =
         viewerData?.profileImageUrl ?? viewer.photoURL;
 
+    // Resolve the root original post id when reposting a repost.
+    final originalPostId = original.isRepost
+        ? (original.repostOfPostId ?? '').trim()
+        : original.id.trim();
+    if (originalPostId.isEmpty) return;
+
+    // Track the actual post that was reposted (original or repost).
+    final repostTargetPostId = original.id.trim();
+    if (repostTargetPostId.isEmpty) return;
+
+    final originalAuthorId = original.isRepost
+        ? ((original.originalAuthorId ?? '').trim().isNotEmpty
+            ? original.originalAuthorId!.trim()
+            : original.authorId.trim())
+        : original.authorId.trim();
+
     await _firestore.runTransaction((tx) async {
-      final originalRef = postsCol().doc(original.id);
+      final originalRef = postsCol().doc(originalPostId);
       final originalSnap = await tx.get(originalRef);
       if (!originalSnap.exists) return;
 
-      final originalAuthorId =
+      final resolvedAuthorId =
           (originalSnap.data()!['authorId'] as String?)?.trim() ??
-              original.authorId;
+              originalAuthorId;
 
+      // Save a reference to the original post instead of copying its content.
       tx.set(postRef, {
         'authorId': viewer.uid,
         'authorName': viewerData?.displayName ?? (viewer.displayName ?? 'User'),
         'authorProfileImageUrl': viewerData?.profileImageUrl ?? viewer.photoURL,
-        'caption': (caption?.trim().isNotEmpty ?? false) ? caption!.trim() : original.caption,
-        if (original.imageUrls.isNotEmpty) 'imageUrls': original.imageUrls,
-        if (original.imageBase64List.isNotEmpty)
-          'imageBase64List': original.imageBase64List,
-        'recipeTitle': original.recipeTitle,
-        'cookingTime': original.cookingTime,
-        'tags': original.tags,
+        'caption': '',
         'createdAt': now,
         'likeCount': 0,
         'commentCount': 0,
         'repostCount': 0,
-        'repostOfPostId': original.id,
-        'originalAuthorId': original.authorId,
+        'repostOfPostId': originalPostId,
+        'repostTargetPostId': repostTargetPostId,
+        'originalAuthorId': resolvedAuthorId,
       });
-      tx.update(originalRef, {'repostCount': FieldValue.increment(1)});
+      // This increments repost count for the post that was reposted.
+      tx.update(postsCol().doc(repostTargetPostId), {
+        'repostCount': FieldValue.increment(1),
+      });
 
-      if (originalAuthorId.isNotEmpty && originalAuthorId != viewer.uid) {
-        final notifRef = notificationsCol(originalAuthorId)
-            .doc('post_repost_${original.id}_${viewer.uid}');
+      if (resolvedAuthorId.isNotEmpty && resolvedAuthorId != viewer.uid) {
+        final notifRef = notificationsCol(resolvedAuthorId)
+            .doc('post_repost_${originalPostId}_${viewer.uid}');
         tx.set(notifRef, {
           'type': 'post_repost',
-          'postId': original.id,
+          'postId': originalPostId,
+          // This notification opens the repost created by the user.
+          // This helps the original owner see interactions on the repost.
+          'repostId': postRef.id,
           'fromUid': viewer.uid,
           'fromName': reposterName,
           'fromProfileImageUrl': reposterProfileUrl,
           'message': '$reposterName reposted your post',
           'createdAt': now,
           'read': false,
-          'recipientUserId': originalAuthorId,
+          'recipientUserId': resolvedAuthorId,
           'senderUserId': viewer.uid,
         });
       }

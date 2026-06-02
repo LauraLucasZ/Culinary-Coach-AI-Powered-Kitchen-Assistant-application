@@ -4,14 +4,36 @@
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
 import 'package:culinary_coach_app/features/community/presentation/widgets/community_post_card.dart';
+import 'package:culinary_coach_app/features/community/presentation/widgets/comments_sheet.dart';
 import 'package:flutter/material.dart';
 
 // This is a simple "post details" page that renders one post card.
-class PostDetailsScreen extends StatelessWidget {
-  const PostDetailsScreen({super.key, required this.postId});
+class PostDetailsScreen extends StatefulWidget {
+  const PostDetailsScreen({
+    super.key,
+    required this.postId,
+    this.openCommentsOnLoad = false,
+  });
 
   // This is the Firestore document id in the `posts` collection.
   final String postId;
+
+  final bool openCommentsOnLoad;
+
+  @override
+  State<PostDetailsScreen> createState() => _PostDetailsScreenState();
+}
+
+class _PostDetailsScreenState extends State<PostDetailsScreen> {
+  bool _openedComments = false;
+
+  Future<void> _maybeOpenComments() async {
+    if (_openedComments) return;
+    if (!widget.openCommentsOnLoad) return;
+    _openedComments = true;
+    if (!mounted) return;
+    await CommentsSheet.show(context, postId: widget.postId);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +53,7 @@ class PostDetailsScreen extends StatelessWidget {
       ),
       body: StreamBuilder(
         // This watches the post document, so changes appear without refreshing.
-        stream: repo.watchPostById(postId),
+        stream: repo.watchPostById(widget.postId),
         builder: (context, snap) {
           final post = snap.data;
 
@@ -41,7 +63,7 @@ class PostDetailsScreen extends StatelessWidget {
               child: Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(
-                  'This post is not available anymore.',
+                  'This content is no longer available.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.textSecondary,
@@ -52,6 +74,11 @@ class PostDetailsScreen extends StatelessWidget {
               ),
             );
           }
+
+          // This opens the comments sheet for comment/reply notifications after the post is loaded.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _maybeOpenComments();
+          });
 
           // This keeps the current community post UI by reusing the same post card widget.
           return ListView(

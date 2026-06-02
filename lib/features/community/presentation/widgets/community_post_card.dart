@@ -54,178 +54,189 @@ class CommunityPostCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _HeaderRow(
-            authorId: post.authorId,
-            authorName: post.authorName,
-            authorProfileImageUrl: post.authorProfileImageUrl,
-            createdAt: post.createdAt,
-            // Student note: only the owner should see edit/delete options.
-            isOwner: (currentUid ?? '').trim().isNotEmpty &&
-                (currentUid ?? '').trim() == post.authorId.trim(),
-            // Student note: reposts should not be editable (only removable).
-            isRepost: post.isRepost,
-            onEdit: () async {
-              // This opens the full post editor (caption + photos).
-              await Navigator.of(context).push<bool>(
-                MaterialPageRoute<bool>(
-                  builder: (_) => EditPostScreen(post: post),
-                ),
-              );
-            },
-            onDelete: () async {
-              final isRepost = post.isRepost;
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (ctx) {
-                  final isDark = Theme.of(ctx).brightness == Brightness.dark;
-                  final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
-                  final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
-                  final secondary = isDark ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
-                  return AlertDialog(
-                    backgroundColor: bg,
-                    surfaceTintColor: Colors.transparent,
-                    title: Text(
-                      isRepost ? 'Delete Repost?' : 'Delete Post?',
-                      style: TextStyle(color: title, fontWeight: FontWeight.w800),
+          if (post.isRepost)
+            StreamBuilder<CommunityPost?>(
+              stream: repo.watchPostById(post.contentSourcePostId),
+              builder: (context, snap) {
+                final original = snap.data;
+                final headerAuthorId = post.authorId.trim();
+                final headerAuthorName = post.authorName.trim();
+                final headerAuthorProfile = post.authorProfileImageUrl;
+                final headerCreatedAt = post.createdAt;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _HeaderRow(
+                      authorId: headerAuthorId,
+                      authorName: headerAuthorName,
+                      authorProfileImageUrl: headerAuthorProfile,
+                      createdAt: headerCreatedAt,
+                      // Only the repost owner sees delete in the menu.
+                      isOwner: (currentUid ?? '').trim().isNotEmpty &&
+                          (currentUid ?? '').trim() == post.authorId.trim(),
+                      isRepost: true,
+                      onEdit: () async {},
+                      onDelete: () async {
+                        final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) {
+                            final isDark = Theme.of(ctx).brightness == Brightness.dark;
+                            final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+                            final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+                            final secondary = isDark ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+                            return AlertDialog(
+                              backgroundColor: bg,
+                              surfaceTintColor: Colors.transparent,
+                              title: Text(
+                                'Delete Repost?',
+                                style: TextStyle(color: title, fontWeight: FontWeight.w800),
+                              ),
+                              content: Text(
+                                'This will remove only your repost (the original post will stay).',
+                                style: TextStyle(color: secondary, fontWeight: FontWeight.w600),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(true),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: const Color(0xFFB3261E),
+                                  ),
+                                  child: const Text('Delete'),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                        if (ok != true) return;
+                        try {
+                          await repo.deleteRepost(repostPostId: post.id);
+                        } catch (_) {}
+                      },
+                      onAuthorTap: () {
+                        if (headerAuthorId.isEmpty) return;
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ProfileScreen(userId: headerAuthorId),
+                          ),
+                        );
+                      },
                     ),
-                    content: Text(
-                      isRepost
-                          ? 'This will remove only your repost (the original post will stay).'
-                          : 'This will permanently delete your post.',
-                      style: TextStyle(color: secondary, fontWeight: FontWeight.w600),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(true),
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFB3261E),
+                    const SizedBox(height: 10),
+                    const _RepostLabel(),
+                    if (snap.connectionState == ConnectionState.waiting &&
+                        original == null)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
                         ),
-                        child: const Text('Delete'),
-                      ),
-                    ],
-                  );
-                },
-              );
-              if (ok != true) return;
-              try {
-                if (isRepost) {
-                  await repo.deleteRepost(repostPostId: post.id);
-                } else {
-                  await repo.deletePost(postId: post.id);
-                }
-              } catch (_) {}
-            },
-            onAuthorTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => ProfileScreen(userId: post.authorId),
-                ),
-              );
-            },
-          ),
-          if (post.isRepost) ...[
-            const SizedBox(height: 10),
-            _RepostPill(),
-          ],
-          if (post.caption.trim().isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              post.caption,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: bodyTextColor,
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
-                  ),
-            ),
-          ],
-          if ((post.recipeTitle ?? '').trim().isNotEmpty ||
-              (post.cookingTime ?? '').trim().isNotEmpty ||
-              post.tags.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if ((post.recipeTitle ?? '').trim().isNotEmpty)
-                  _MetaChip(
-                    icon: Icons.receipt_long_rounded,
-                    label: post.recipeTitle!.trim(),
-                  ),
-                if ((post.cookingTime ?? '').trim().isNotEmpty)
-                  _MetaChip(
-                    icon: Icons.schedule_rounded,
-                    label: post.cookingTime!.trim(),
-                  ),
-                for (final tag in post.tags.take(4))
-                  _MetaChip(icon: Icons.sell_rounded, label: tag),
-              ],
-            ),
-          ],
-          if (post.hasPostImages) ...[
-            const SizedBox(height: 12),
-            _PostMediaGallery(
-              networkUrls: post.imageUrls,
-              base64Images: post.imageBase64List,
-            ),
-          ],
-          const SizedBox(height: 12),
-          // --- Post actions row (like, comment, repost) ---
-          Row(
-            children: [
-              Expanded(
-                child: currentUid == null
-                    ? _ActionPill(
-                        icon: Icons.favorite_border_rounded,
-                        label: _formatCount(post.likeCount),
-                        onTap: null,
                       )
-                    : StreamBuilder<bool>(
-                        // Firestore likedBy array — UI updates when like toggles.
-                        stream:
-                            repo.watchHasLiked(postId: post.id, uid: currentUid),
-                        builder: (context, snap) {
-                          final hasLiked = snap.data ?? false;
-                          return _ActionPill(
-                            icon: hasLiked
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border_rounded,
-                            iconColor:
-                                hasLiked ? const Color(0xFFB3261E) : null,
-                            label: _formatCount(post.likeCount),
-                            onTap: () => repo.toggleLike(postId: post.id),
-                          );
-                        },
+                    else if (original == null)
+                      const _UnavailableOriginalPost()
+                    else
+                      _PostContentSection(
+                        contentPost: original,
+                        interactionPostId: post.id,
+                        interactionLikeCount: post.likeCount,
+                        interactionCommentCount: post.commentCount,
+                        interactionRepostCount: post.repostCount,
+                        bodyTextColor: bodyTextColor,
+                        actionsEnabled: true,
+                        currentUid: currentUid,
+                        repo: repo,
                       ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ActionPill(
-                  icon: Icons.mode_comment_outlined,
-                  label: _formatCount(post.commentCount),
-                  // Opens comments bottom sheet (modal route, not full Navigator page).
-                  onTap: () => CommentsSheet.show(
-                    context,
-                    postId: post.id,
+                  ],
+                );
+              },
+            )
+          else ...[
+            _HeaderRow(
+              authorId: post.authorId,
+              authorName: post.authorName,
+              authorProfileImageUrl: post.authorProfileImageUrl,
+              createdAt: post.createdAt,
+              // Only the post owner sees edit and delete in the menu.
+              isOwner: (currentUid ?? '').trim().isNotEmpty &&
+                  (currentUid ?? '').trim() == post.authorId.trim(),
+              // Reposts can be deleted but not edited.
+              isRepost: post.isRepost,
+              onEdit: () async {
+                // This opens the full post editor (caption + photos).
+                await Navigator.of(context).push<bool>(
+                  MaterialPageRoute<bool>(
+                    builder: (_) => EditPostScreen(post: post),
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ActionPill(
-                  icon: Icons.repeat_rounded,
-                  label: _formatCount(post.repostCount),
-                  onTap: currentUid == null
-                      ? null
-                      : () => repo.repost(original: post),
-                ),
-              ),
-            ],
-          ),
-          _PostCommentPreview(post: post),
+                );
+              },
+              onDelete: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) {
+                    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+                    final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+                    final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+                    final secondary = isDark ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+                    return AlertDialog(
+                      backgroundColor: bg,
+                      surfaceTintColor: Colors.transparent,
+                      title: Text(
+                        'Delete Post?',
+                        style: TextStyle(color: title, fontWeight: FontWeight.w800),
+                      ),
+                      content: Text(
+                        'This will permanently delete your post.',
+                        style: TextStyle(color: secondary, fontWeight: FontWeight.w600),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFFB3261E),
+                          ),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+                if (ok != true) return;
+                try {
+                  await repo.deletePost(postId: post.id);
+                } catch (_) {}
+              },
+              onAuthorTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ProfileScreen(userId: post.authorId),
+                  ),
+                );
+              },
+            ),
+            _PostContentSection(
+              contentPost: post,
+              interactionPostId: post.id,
+              interactionLikeCount: post.likeCount,
+              interactionCommentCount: post.commentCount,
+              interactionRepostCount: post.repostCount,
+              bodyTextColor: bodyTextColor,
+              actionsEnabled: true,
+              currentUid: currentUid,
+              repo: repo,
+            ),
+          ],
         ],
       ),
     );
@@ -234,20 +245,212 @@ class CommunityPostCard extends StatelessWidget {
   static String _formatCount(int v) => v.toString();
 }
 
-// Shows latest comment + reply under the post before opening the full sheet.
-class _PostCommentPreview extends StatelessWidget {
-  const _PostCommentPreview({required this.post});
+// Caption, media, actions, and comment preview for a post (or resolved original).
+class _PostContentSection extends StatelessWidget {
+  const _PostContentSection({
+    required this.contentPost,
+    required this.interactionPostId,
+    required this.interactionLikeCount,
+    required this.interactionCommentCount,
+    required this.interactionRepostCount,
+    required this.bodyTextColor,
+    required this.actionsEnabled,
+    required this.currentUid,
+    required this.repo,
+  });
 
-  final CommunityPost post;
+  final CommunityPost contentPost;
+  final String interactionPostId;
+  final int interactionLikeCount;
+  final int interactionCommentCount;
+  final int interactionRepostCount;
+  final Color bodyTextColor;
+  final bool actionsEnabled;
+  final String? currentUid;
+  final CommunityRepository repo;
 
   @override
   Widget build(BuildContext context) {
-    if (post.commentCount <= 0) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (contentPost.caption.trim().isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(
+            contentPost.caption,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: bodyTextColor,
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+          ),
+        ],
+        if ((contentPost.recipeTitle ?? '').trim().isNotEmpty ||
+            (contentPost.cookingTime ?? '').trim().isNotEmpty ||
+            contentPost.tags.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if ((contentPost.recipeTitle ?? '').trim().isNotEmpty)
+                _MetaChip(
+                  icon: Icons.receipt_long_rounded,
+                  label: contentPost.recipeTitle!.trim(),
+                ),
+              if ((contentPost.cookingTime ?? '').trim().isNotEmpty)
+                _MetaChip(
+                  icon: Icons.schedule_rounded,
+                  label: contentPost.cookingTime!.trim(),
+                ),
+              for (final tag in contentPost.tags.take(4))
+                _MetaChip(icon: Icons.sell_rounded, label: tag),
+            ],
+          ),
+        ],
+        if (contentPost.hasPostImages) ...[
+          const SizedBox(height: 12),
+          _PostMediaGallery(
+            networkUrls: contentPost.imageUrls,
+            base64Images: contentPost.imageBase64List,
+          ),
+        ],
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: currentUid == null || !actionsEnabled
+                  ? _ActionPill(
+                      icon: Icons.favorite_border_rounded,
+                      label: CommunityPostCard._formatCount(interactionLikeCount),
+                      onTap: null,
+                    )
+                  : StreamBuilder<bool>(
+                      stream: repo.watchHasLiked(
+                        postId: interactionPostId,
+                        uid: currentUid!,
+                      ),
+                      builder: (context, snap) {
+                        final hasLiked = snap.data ?? false;
+                        return _ActionPill(
+                          icon: hasLiked
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          iconColor:
+                              hasLiked ? const Color(0xFFB3261E) : null,
+                          label: CommunityPostCard._formatCount(
+                            interactionLikeCount,
+                          ),
+                          onTap: () =>
+                              repo.toggleLike(postId: interactionPostId),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _ActionPill(
+                icon: Icons.mode_comment_outlined,
+                label: CommunityPostCard._formatCount(interactionCommentCount),
+                onTap: actionsEnabled && currentUid != null
+                    ? () => CommentsSheet.show(
+                          context,
+                          postId: interactionPostId,
+                        )
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _ActionPill(
+                icon: Icons.repeat_rounded,
+                label: CommunityPostCard._formatCount(interactionRepostCount),
+                onTap: actionsEnabled && currentUid != null
+                    ? () => repo.repost(original: contentPost)
+                    : null,
+              ),
+            ),
+          ],
+        ),
+        _PostCommentPreview(
+          postId: interactionPostId,
+          commentCount: interactionCommentCount,
+        ),
+      ],
+    );
+  }
+}
+
+// Shown when the original post was deleted but the repost wrapper still exists.
+class _UnavailableOriginalPost extends StatelessWidget {
+  const _UnavailableOriginalPost();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final bg =
+        isDarkMode ? const Color(0xFF1E1E1E) : AppColors.surfaceMuted;
+    final border =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final titleColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+    final subtitleColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Original post unavailable',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: titleColor,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'This post was removed by its owner.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: subtitleColor,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Shows latest comment + reply under the post before opening the full sheet.
+class _PostCommentPreview extends StatelessWidget {
+  const _PostCommentPreview({
+    required this.postId,
+    required this.commentCount,
+  });
+
+  final String postId;
+  final int commentCount;
+
+  @override
+  Widget build(BuildContext context) {
+    if (commentCount <= 0) return const SizedBox.shrink();
 
     final repo = CommunityRepository();
     // StreamBuilder loads latest comment preview from posts/{id}/comments.
     return StreamBuilder<List<CommunityComment>>(
-      stream: repo.watchCommentPreviewForPost(post.id),
+      stream: repo.watchCommentPreviewForPost(postId),
       builder: (context, snap) {
         final comments = snap.data ?? const <CommunityComment>[];
         if (comments.isEmpty &&
@@ -266,7 +469,7 @@ class _PostCommentPreview extends StatelessWidget {
         }
         if (comments.isEmpty) return const SizedBox.shrink();
 
-        final moreComments = post.commentCount > comments.length;
+        final moreComments = commentCount > comments.length;
         final moreReplies = comments.any((c) => c.replies.length > 2);
         final showViewMore = moreComments || moreReplies;
 
@@ -304,7 +507,7 @@ class _PostCommentPreview extends StatelessWidget {
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       onPressed: () =>
-                          CommentsSheet.show(context, postId: post.id),
+                          CommentsSheet.show(context, postId: postId),
                       child: const Text('View more comments'),
                     ),
                   ),
@@ -507,7 +710,7 @@ class _HeaderRow extends StatelessWidget {
             color: isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
             surfaceTintColor: Colors.transparent,
             onSelected: (v) {
-              // Student note: if it's a repost, we don't allow editing at all.
+              // Reposts cannot be edited from this menu.
               if (v == 'edit' && !isRepost) onEdit();
               if (v == 'delete') onDelete();
             },
@@ -663,7 +866,9 @@ class _ActionPill extends StatelessWidget {
   }
 }
 
-class _RepostPill extends StatelessWidget {
+class _RepostLabel extends StatelessWidget {
+  const _RepostLabel();
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;

@@ -51,7 +51,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           : n.fromUid.trim();
       if (uid.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This user is not available anymore.')),
+          const SnackBar(content: Text('This content is no longer available.')),
         );
         return;
       }
@@ -63,10 +63,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     // This opens the exact post for like/comment/repost notifications.
     if (_isPostNotificationType(type)) {
-      final postId = (n.postId ?? '').trim();
+      final postId = type == 'post_repost'
+          ? (n.repostId ?? '').trim()
+          : (n.postId ?? '').trim();
       if (postId.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This post is not available anymore.')),
+          SnackBar(
+            content: Text(
+              'This content is no longer available.',
+            ),
+          ),
         );
         return;
       }
@@ -76,13 +82,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (!context.mounted) return;
       if (post == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This post was deleted.')),
+          SnackBar(
+            content: Text(
+              'This content is no longer available.',
+            ),
+          ),
         );
         return;
       }
 
       Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => PostDetailsScreen(postId: postId)),
+        MaterialPageRoute<void>(
+          builder: (_) => PostDetailsScreen(
+            postId: postId,
+            openCommentsOnLoad: type == 'comment' || type == 'reply',
+          ),
+        ),
       );
       return;
     }
@@ -92,7 +107,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final storyId = (n.storyId ?? '').trim();
       if (storyId.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This story is not available anymore.')),
+          const SnackBar(content: Text('This content is no longer available.')),
         );
         return;
       }
@@ -102,7 +117,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (!context.mounted) return;
       if (story == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('This story was deleted or expired.')),
+          const SnackBar(content: Text('This content is no longer available.')),
         );
         return;
       }

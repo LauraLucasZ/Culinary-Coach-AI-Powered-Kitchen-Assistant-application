@@ -335,6 +335,8 @@ class _CommentBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = comment;
     final liked = c.isLikedBy(currentUid);
+    final isOwner = (currentUid ?? '').trim().isNotEmpty &&
+        (currentUid ?? '').trim() == c.uid.trim();
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final cardColor =
         isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
@@ -346,6 +348,94 @@ class _CommentBlock extends StatelessWidget {
         isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
     final mutedColor =
         isDarkMode ? const Color(0xFF9A9A9A) : AppColors.textMuted;
+
+    Future<void> editComment() async {
+      final controller = TextEditingController(text: c.text);
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+          final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+          final secondary = isDark ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+          return AlertDialog(
+            backgroundColor: bg,
+            surfaceTintColor: Colors.transparent,
+            title: Text(
+              'Edit comment',
+              style: TextStyle(color: title, fontWeight: FontWeight.w800),
+            ),
+            content: TextField(
+              controller: controller,
+              minLines: 1,
+              maxLines: 5,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Edit your comment...',
+                hintStyle: TextStyle(color: secondary, fontWeight: FontWeight.w600),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      );
+      if (ok != true) return;
+      try {
+        await repo.updateCommentText(
+          postId: postId,
+          commentId: c.id,
+          text: controller.text,
+        );
+      } catch (_) {}
+    }
+
+    Future<void> deleteComment() async {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+          final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+          final secondary = isDark ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+          return AlertDialog(
+            backgroundColor: bg,
+            surfaceTintColor: Colors.transparent,
+            title: Text(
+              'Delete comment?',
+              style: TextStyle(color: title, fontWeight: FontWeight.w800),
+            ),
+            content: Text(
+              'This will delete your comment and its replies.',
+              style: TextStyle(color: secondary, fontWeight: FontWeight.w600),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: TextButton.styleFrom(foregroundColor: const Color(0xFFB3261E)),
+                child: const Text('Delete'),
+              ),
+            ],
+          );
+        },
+      );
+      if (ok != true) return;
+      try {
+        await repo.deleteComment(postId: postId, commentId: c.id);
+      } catch (_) {}
+    }
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -391,6 +481,37 @@ class _CommentBlock extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
+                        if (isOwner) ...[
+                          const SizedBox(width: 4),
+                          PopupMenuButton<String>(
+                            tooltip: 'Comment options',
+                            icon: Icon(Icons.more_horiz_rounded, color: mutedColor),
+                            color: isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+                            surfaceTintColor: Colors.transparent,
+                            onSelected: (v) {
+                              if (v == 'edit') {
+                                () async {
+                                  await editComment();
+                                }();
+                              }
+                              if (v == 'delete') {
+                                () async {
+                                  await deleteComment();
+                                }();
+                              }
+                            },
+                            itemBuilder: (context) => const [
+                              PopupMenuItem<String>(
+                                value: 'edit',
+                                child: Text('Edit'),
+                              ),
+                              PopupMenuItem<String>(
+                                value: 'delete',
+                                child: Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -510,6 +631,8 @@ class _ReplyRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = reply;
     final liked = r.isLikedBy(currentUid);
+    final isOwner = (currentUid ?? '').trim().isNotEmpty &&
+        (currentUid ?? '').trim() == r.userId.trim();
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final titleColor =
         isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
@@ -517,6 +640,99 @@ class _ReplyRow extends StatelessWidget {
         isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
     final mutedColor =
         isDarkMode ? const Color(0xFF9A9A9A) : AppColors.textMuted;
+
+    Future<void> editReply() async {
+      final controller = TextEditingController(text: r.text);
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+          final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+          final secondary = isDark ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+          return AlertDialog(
+            backgroundColor: bg,
+            surfaceTintColor: Colors.transparent,
+            title: Text(
+              'Edit reply',
+              style: TextStyle(color: title, fontWeight: FontWeight.w800),
+            ),
+            content: TextField(
+              controller: controller,
+              minLines: 1,
+              maxLines: 5,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Edit your reply...',
+                hintStyle: TextStyle(color: secondary, fontWeight: FontWeight.w600),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      );
+      if (ok != true) return;
+      try {
+        await repo.updateReplyText(
+          postId: postId,
+          commentId: commentId,
+          replyId: r.id,
+          text: controller.text,
+        );
+      } catch (_) {}
+    }
+
+    Future<void> deleteReply() async {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+          final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+          final secondary = isDark ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+          return AlertDialog(
+            backgroundColor: bg,
+            surfaceTintColor: Colors.transparent,
+            title: Text(
+              'Delete reply?',
+              style: TextStyle(color: title, fontWeight: FontWeight.w800),
+            ),
+            content: Text(
+              'This will delete your reply.',
+              style: TextStyle(color: secondary, fontWeight: FontWeight.w600),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: TextButton.styleFrom(foregroundColor: const Color(0xFFB3261E)),
+                child: const Text('Delete'),
+              ),
+            ],
+          );
+        },
+      );
+      if (ok != true) return;
+      try {
+        await repo.deleteReply(
+          postId: postId,
+          commentId: commentId,
+          replyId: r.id,
+        );
+      } catch (_) {}
+    }
 
     return Padding(
       padding: const EdgeInsets.only(left: 8, top: 6, bottom: 6),
@@ -553,6 +769,37 @@ class _ReplyRow extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                     ),
+                    if (isOwner) ...[
+                      const SizedBox(width: 4),
+                      PopupMenuButton<String>(
+                        tooltip: 'Reply options',
+                        icon: Icon(Icons.more_horiz_rounded, color: mutedColor, size: 18),
+                        color: isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+                        surfaceTintColor: Colors.transparent,
+                        onSelected: (v) {
+                          if (v == 'edit') {
+                            () async {
+                              await editReply();
+                            }();
+                          }
+                          if (v == 'delete') {
+                            () async {
+                              await deleteReply();
+                            }();
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem<String>(
+                            value: 'edit',
+                            child: Text('Edit'),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'delete',
+                            child: Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 2),
