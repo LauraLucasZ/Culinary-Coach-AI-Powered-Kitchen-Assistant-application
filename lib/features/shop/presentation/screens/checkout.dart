@@ -33,6 +33,7 @@ class _MapZoomButton extends StatelessWidget {
   const _MapZoomButton({required this.icon, required this.onTap});
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
@@ -475,20 +476,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldColor = isDarkMode ? const Color(0xFF121212) : const Color(0xFFFFFAF4);
+    final primaryText = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF2C1810);
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFAF4),
+      backgroundColor: scaffoldColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           onPressed: prevStep,
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF2C1810), size: 20),
+          icon: Icon(Icons.arrow_back_ios, color: primaryText, size: 20),
         ),
-        title: const Text(
+        title: Text(
           'Checkout',
           style: TextStyle(
-            color: Color(0xFF2C1810),
+            color: primaryText,
             fontSize: 24,
             fontWeight: FontWeight.w600,
           ),
@@ -517,6 +522,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               index: currentStep,
               children: [
                 CartStep(
+                  isDarkMode: isDarkMode,
                   cartItems: widget.cartItems,
                   subtotal: widget.subtotal,
                   itemCount: widget.itemCount,
@@ -525,6 +531,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   total: total,
                 ),
                 AddressDeliveryStep(
+                  isDarkMode: isDarkMode,
                   selectedDelivery: selectedDelivery,
                   selectedAddress: selectedAddress,
                   deliveryOptions: deliveryOptions,
@@ -542,6 +549,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   },
                 ),
                 PaymentStep(
+                  isDarkMode: isDarkMode,
                   selectedPaymentMethod: selectedPaymentMethod,
                   onPaymentMethodChanged: (value) {
                     setState(() {
@@ -596,6 +604,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildStep(int stepIndex, IconData icon, String label) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final isCompleted = currentStep > stepIndex;
     final isCurrent = currentStep == stepIndex;
 
@@ -610,7 +619,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ? const Color(0xFF4CAF50)
                 : (isCurrent
                 ? const Color(0xFFF4A32D)
-                : const Color(0xFFE0E0E0)),
+                : (isDarkMode
+                    ? const Color(0xFF4A4A4A)
+                    : const Color(0xFFE0E0E0))),
           ),
           child: isCompleted
               ? const Icon(Icons.check, size: 18, color: Colors.white)
@@ -629,7 +640,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ? const Color(0xFF4CAF50)
                 : (isCurrent
                 ? const Color(0xFFF4A32D)
-                : const Color(0xFFBDBDBD)),
+                : (isDarkMode
+                    ? const Color(0xFF9A9A9A)
+                    : const Color(0xFFBDBDBD))),
             fontWeight: (isCompleted || isCurrent)
                 ? FontWeight.w600
                 : FontWeight.normal,
@@ -640,13 +653,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildLine(int stepIndex) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final isCompleted = currentStep > stepIndex;
 
     return Expanded(
       child: Container(
         height: 1.5,
         margin: const EdgeInsets.symmetric(horizontal: 8),
-        color: isCompleted ? const Color(0xFF4CAF50) : const Color(0xFFE0E0E0),
+        color: isCompleted
+            ? const Color(0xFF4CAF50)
+            : (isDarkMode ? const Color(0xFF4A4A4A) : const Color(0xFFE0E0E0)),
       ),
     );
   }
@@ -654,6 +670,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
 // First checkout step showing cart items and summary
 class CartStep extends StatelessWidget {
+  final bool isDarkMode;
   final List<Map<String, dynamic>> cartItems;
   final double subtotal;
   final int itemCount;
@@ -663,6 +680,7 @@ class CartStep extends StatelessWidget {
 
   const CartStep({
     super.key,
+    required this.isDarkMode,
     required this.cartItems,
     required this.subtotal,
     required this.itemCount,
@@ -672,6 +690,7 @@ class CartStep extends StatelessWidget {
   });
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     final items = cartItems ?? [];
 
@@ -682,14 +701,16 @@ class CartStep extends StatelessWidget {
         children: [
           // Cart Items
           if (items.isEmpty)
-            const Center(
+            Center(
               child: Padding(
-                padding: EdgeInsets.all(40),
+                padding: const EdgeInsets.all(40),
                 child: Text(
                   'Your cart is empty',
                   style: TextStyle(
                     fontSize: 16,
-                    color: Color(0xFF8B7355),
+                    color: isDarkMode
+                        ? const Color(0xFFBEBEBE)
+                        : const Color(0xFF8B7355),
                   ),
                 ),
               ),
@@ -716,7 +737,7 @@ class CartStep extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDarkMode ? const Color(0xFF232323) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -732,7 +753,7 @@ class CartStep extends StatelessWidget {
             width: 70,
             height: 70,
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
+              color: isDarkMode ? const Color(0xFF2D2D2D) : const Color(0xFFF5F5F5),
               borderRadius: BorderRadius.circular(12),
             ),
             child: imageUrl.isNotEmpty
@@ -762,18 +783,18 @@ class CartStep extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
-                    color: Color(0xFF2C1810),
+                    color: isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF2C1810),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Quantity: $quantity',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF8B7355),
+                    color: isDarkMode ? const Color(0xFFBEBEBE) : const Color(0xFF8B7355),
                   ),
                 ),
               ],
@@ -796,7 +817,7 @@ class CartStep extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDarkMode ? const Color(0xFF232323) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -809,19 +830,23 @@ class CartStep extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Order Summary',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF2C1810),
+              color: isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF2C1810),
             ),
           ),
           const SizedBox(height: 16),
           _buildSummaryRow('Subtotal ($itemCount items)', '${subtotal.toStringAsFixed(2)} EGP'),
           const SizedBox(height: 12),
           _buildSummaryRow('Discount', '-${discount.toStringAsFixed(2)} EGP', isDiscount: true),
-          const Divider(height: 24, color: Color(0xFFE8E8E8), thickness: 1),
+          Divider(
+            height: 24,
+            color: isDarkMode ? const Color(0xFF444444) : const Color(0xFFE8E8E8),
+            thickness: 1,
+          ),
           _buildSummaryRow('Total', '${total.toStringAsFixed(2)} EGP', isTotal: true),
         ],
       ),
@@ -837,7 +862,9 @@ class CartStep extends StatelessWidget {
           style: TextStyle(
             fontSize: isTotal ? 15 : 14,
             fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
-            color: isTotal ? const Color(0xFF2C1810) : const Color(0xFF8B7355),
+            color: isTotal
+                ? (isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF2C1810))
+                : (isDarkMode ? const Color(0xFFBEBEBE) : const Color(0xFF8B7355)),
           ),
         ),
         Text(
@@ -847,7 +874,11 @@ class CartStep extends StatelessWidget {
             fontWeight: isTotal ? FontWeight.w700 : FontWeight.normal,
             color: isDiscount
                 ? const Color(0xFF4CAF50)
-                : (isTotal ? const Color(0xFFF4A32D) : const Color(0xFF2C1810)),
+                : (isTotal
+                    ? const Color(0xFFF4A32D)
+                    : (isDarkMode
+                        ? const Color(0xFFF2F2F2)
+                        : const Color(0xFF2C1810))),
           ),
         ),
       ],
@@ -887,6 +918,7 @@ class DeliveryOption {
 
 // Checkout step for delivery address and delivery options
 class AddressDeliveryStep extends StatelessWidget {
+  final bool isDarkMode;
   final String selectedDelivery;
   final DeliveryAddress selectedAddress;
   final List<DeliveryOption> deliveryOptions;
@@ -897,6 +929,7 @@ class AddressDeliveryStep extends StatelessWidget {
 
   const AddressDeliveryStep({
     super.key,
+    required this.isDarkMode,
     required this.selectedDelivery,
     required this.selectedAddress,
     required this.deliveryOptions,
@@ -927,25 +960,30 @@ class AddressDeliveryStep extends StatelessWidget {
   String _formatFee(double fee) => '${fee.toStringAsFixed(2)} EGP';
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
+    final cardColor = isDarkMode ? const Color(0xFF232323) : Colors.white;
+    final primaryText = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF2C1810);
+    final secondaryText = isDarkMode ? const Color(0xFFBEBEBE) : const Color(0xFF8B7355);
+    final borderColor = isDarkMode ? const Color(0xFF444444) : const Color(0xFFE8DCCF);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Delivery Address',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF2C1810),
+              color: primaryText,
             ),
           ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -977,9 +1015,9 @@ class AddressDeliveryStep extends StatelessWidget {
                     children: [
                       Text(
                         selectedAddress.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF2C1810),
+                          color: primaryText,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -987,8 +1025,8 @@ class AddressDeliveryStep extends StatelessWidget {
                         selectedAddress.address,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF8B7355),
+                        style: TextStyle(
+                          color: secondaryText,
                           fontSize: 13,
                         ),
                       ),
@@ -1022,8 +1060,8 @@ class AddressDeliveryStep extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Delivery fee is calculated after your address: ${_formatDistance(distanceKm)}.',
-                    style: const TextStyle(
-                      color: Color(0xFF2C1810),
+                    style: TextStyle(
+                      color: primaryText,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1035,18 +1073,18 @@ class AddressDeliveryStep extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          const Text(
+          Text(
             'Choose Delivery Option',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF2C1810),
+              color: primaryText,
             ),
           ),
           const SizedBox(height: 12),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -1067,7 +1105,7 @@ class AddressDeliveryStep extends StatelessWidget {
                     },
                     title: Text(
                       '${deliveryOptions[i].title} (${deliveryOptions[i].time})',
-                      style: const TextStyle(color: Color(0xFF2C1810), fontSize: 14),
+                      style: TextStyle(color: primaryText, fontSize: 14),
                     ),
                     subtitle: Text(
                       distanceKm <= 3
@@ -1075,7 +1113,7 @@ class AddressDeliveryStep extends StatelessWidget {
                           : distanceKm <= 8
                           ? 'Medium distance fee'
                           : 'Far address fee',
-                      style: const TextStyle(color: Color(0xFF8B7355), fontSize: 12),
+                      style: TextStyle(color: secondaryText, fontSize: 12),
                     ),
                     secondary: Text(
                       _formatFee(deliveryOptions[i].fee),
@@ -1083,14 +1121,17 @@ class AddressDeliveryStep extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: deliveryOptions[i].id == selectedDelivery
                             ? const Color(0xFFF4A32D)
-                            : const Color(0xFF2C1810),
+                            : primaryText,
                       ),
                     ),
                     activeColor: const Color(0xFFF4A32D),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
                   if (i != deliveryOptions.length - 1)
-                    const Divider(height: 1, color: Color(0xFFE8E8E8)),
+                    Divider(
+                      height: 1,
+                      color: isDarkMode ? const Color(0xFF444444) : const Color(0xFFE8E8E8),
+                    ),
                 ],
               ],
             ),
@@ -1100,17 +1141,17 @@ class AddressDeliveryStep extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE8DCCF)),
+              border: Border.all(color: borderColor),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Selected Delivery Fee',
                   style: TextStyle(
-                    color: Color(0xFF8B7355),
+                    color: secondaryText,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1451,6 +1492,7 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
   }
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     final point = selectedPoint ?? const LatLng(30.0444, 31.2357);
 
@@ -1728,6 +1770,7 @@ class _AddressPickerScreenState extends State<AddressPickerScreen> {
 // ============================================================
 // Checkout payment screen
 class PaymentStep extends StatelessWidget {
+  final bool isDarkMode;
   final String selectedPaymentMethod;
   final Function(String) onPaymentMethodChanged;
   final TextEditingController cardNumberController;
@@ -1738,6 +1781,7 @@ class PaymentStep extends StatelessWidget {
 
   const PaymentStep({
     super.key,
+    required this.isDarkMode,
     required this.selectedPaymentMethod,
     required this.onPaymentMethodChanged,
     required this.cardNumberController,
@@ -1748,25 +1792,31 @@ class PaymentStep extends StatelessWidget {
   });
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
+    final cardColor = isDarkMode ? const Color(0xFF232323) : Colors.white;
+    final primaryText = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF2C1810);
+    final secondaryText = isDarkMode ? const Color(0xFFBEBEBE) : const Color(0xFF8B7355);
+    final borderColor = isDarkMode ? const Color(0xFF444444) : const Color(0xFFE8DCCF);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Payment Methods Title
-          const Text(
+          Text(
             'Payment Method',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF2C1810),
+              color: primaryText,
             ),
           ),
           const SizedBox(height: 12),
 
           // Credit / Debit Card
           _buildPaymentMethodWithImage(
+            isDarkMode: isDarkMode,
             title: 'Credit / Debit Card',
             subtitle: 'Visa, Mastercard, Amex',
             imagePath: 'assets/images/mastercard.jpg',
@@ -1776,6 +1826,7 @@ class PaymentStep extends StatelessWidget {
 
           // Digital Wallet
           _buildPaymentMethodWithImage(
+            isDarkMode: isDarkMode,
             title: 'Digital Wallet',
             subtitle: 'Apple Pay / Google Pay',
             imagePath: 'assets/images/digital_wallet.png',
@@ -1785,6 +1836,7 @@ class PaymentStep extends StatelessWidget {
 
           // Cash on Delivery
           _buildPaymentMethodWithImage(
+            isDarkMode: isDarkMode,
             title: 'Cash on Delivery',
             subtitle: 'Pay when you receive',
             imagePath: 'assets/images/cash_on_delivery.png',
@@ -1794,19 +1846,19 @@ class PaymentStep extends StatelessWidget {
           // Card Details (only show if card is selected)
           if (selectedPaymentMethod == 'card') ...[
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Card Details',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF2C1810),
+                color: primaryText,
               ),
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardColor,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -1819,6 +1871,7 @@ class PaymentStep extends StatelessWidget {
               child: Column(
                 children: [
                   _buildCardField(
+                    isDarkMode: isDarkMode,
                     controller: cardNumberController,
                     label: 'Card Number',
                     hint: 'Card number',
@@ -1826,6 +1879,7 @@ class PaymentStep extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   _buildCardField(
+                    isDarkMode: isDarkMode,
                     controller: cardholderNameController,
                     label: 'Cardholder Name',
                     hint: 'Name on card',
@@ -1836,6 +1890,7 @@ class PaymentStep extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _buildCardField(
+                          isDarkMode: isDarkMode,
                           controller: expiryController,
                           label: 'Expiry Date',
                           hint: 'MM/YY',
@@ -1845,6 +1900,7 @@ class PaymentStep extends StatelessWidget {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildCardField(
+                          isDarkMode: isDarkMode,
                           controller: cvvController,
                           label: 'CVV',
                           hint: 'CVV',
@@ -1865,9 +1921,9 @@ class PaymentStep extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE8DCCF)),
+              border: Border.all(color: borderColor),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -1933,12 +1989,14 @@ class PaymentStep extends StatelessWidget {
               children: [
                 const Icon(Icons.lock_outline, color: Color(0xFFF4A32D), size: 18),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Your payment information is encrypted and secure.',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFFF4A32D),
+                      color: isDarkMode
+                          ? const Color(0xFFFFC884)
+                          : const Color(0xFFF4A32D),
                     ),
                   ),
                 ),
@@ -1952,7 +2010,7 @@ class PaymentStep extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -1965,12 +2023,12 @@ class PaymentStep extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Total Amount',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF2C1810),
+                    color: primaryText,
                   ),
                 ),
                 Text(
@@ -1990,22 +2048,27 @@ class PaymentStep extends StatelessWidget {
   }
 
   Widget _buildPaymentMethodWithImage({
+    required bool isDarkMode,
     required String title,
     required String subtitle,
     required String imagePath,
     required String value,
   }) {
     final isSelected = selectedPaymentMethod == value;
+    final cardColor = isDarkMode ? const Color(0xFF232323) : Colors.white;
+    final borderColor = isDarkMode ? const Color(0xFF444444) : const Color(0xFFE8DCCF);
+    final primaryText = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF2C1810);
+    final secondaryText = isDarkMode ? const Color(0xFFBEBEBE) : const Color(0xFF8B7355);
 
     return GestureDetector(
       onTap: () => onPaymentMethodChanged(value),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? const Color(0xFFF4A32D) : const Color(0xFFE8DCCF),
+            color: isSelected ? const Color(0xFFF4A32D) : borderColor,
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -2046,18 +2109,18 @@ class PaymentStep extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
-                      color: Color(0xFF2C1810),
+                      color: primaryText,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF8B7355),
+                      color: secondaryText,
                     ),
                   ),
                 ],
@@ -2101,21 +2164,25 @@ class PaymentStep extends StatelessWidget {
   }
 
   Widget _buildCardField({
+    required bool isDarkMode,
     required TextEditingController controller,
     required String label,
     required String hint,
     IconData? icon,
     bool obscureText = false,
   }) {
+    final primaryText = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF2C1810);
+    final fieldBg = isDarkMode ? const Color(0xFF2D2D2D) : const Color(0xFFF9F9F9);
+    final hintColor = isDarkMode ? const Color(0xFFB0B0B0) : const Color(0xFFC0A080);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF2C1810),
+            color: primaryText,
           ),
         ),
         const SizedBox(height: 8),
@@ -2131,12 +2198,12 @@ class PaymentStep extends StatelessWidget {
           inputFormatters: _inputFormattersFor(label),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(color: Color(0xFFC0A080), fontSize: 13),
+            hintStyle: TextStyle(color: hintColor, fontSize: 13),
             prefixIcon: icon != null
                 ? Icon(icon, color: const Color(0xFFF4A32D), size: 20)
                 : null,
             filled: true,
-            fillColor: const Color(0xFFF9F9F9),
+            fillColor: fieldBg,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -2210,10 +2277,18 @@ class OrderSuccessScreen extends StatelessWidget {
   });
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
     final screenWidth = mediaQuery.size.width;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldColor = isDarkMode ? const Color(0xFF121212) : const Color(0xFFFFFAF4);
+    final cardColor = isDarkMode ? const Color(0xFF232323) : Colors.white;
+    final primaryText = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF2C1810);
+    final secondaryText = isDarkMode ? const Color(0xFFBEBEBE) : const Color(0xFF8B7355);
+    final dividerColor = isDarkMode ? const Color(0xFF3A3A3A) : const Color(0xFFE8DCCF);
+    final footerColor = isDarkMode ? const Color(0xFF9B9B9B) : const Color(0xFFA08F7E);
 
     // Responsive breakpoints
     final isSmallScreen = screenWidth < 400;
@@ -2230,7 +2305,7 @@ class OrderSuccessScreen extends StatelessWidget {
     final spacing = screenHeight * 0.03;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFAF4),
+      backgroundColor: scaffoldColor,
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -2266,7 +2341,7 @@ class OrderSuccessScreen extends StatelessWidget {
                   style: TextStyle(
                     fontSize: titleSize,
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF2C1810),
+                    color: primaryText,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -2276,7 +2351,7 @@ class OrderSuccessScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: bodySize,
-                    color: const Color(0xFF8B7355),
+                    color: secondaryText,
                     height: 1.5,
                   ),
                 ),
@@ -2286,11 +2361,11 @@ class OrderSuccessScreen extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.all(horizontalPadding),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: cardColor,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withOpacity(isDarkMode ? 0.22 : 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
@@ -2298,23 +2373,24 @@ class OrderSuccessScreen extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      _buildInfoRow('Order ID', orderId, bodySize),
+                      _buildInfoRow('Order ID', orderId, bodySize, isDarkMode: isDarkMode),
                       const SizedBox(height: 14),
-                      _buildInfoRow('Marketplace', marketName, bodySize),
+                      _buildInfoRow('Marketplace', marketName, bodySize, isDarkMode: isDarkMode),
                       const SizedBox(height: 14),
-                      _buildInfoRow('Delivery Option', selectedDeliveryTitle, bodySize),
+                      _buildInfoRow('Delivery Option', selectedDeliveryTitle, bodySize, isDarkMode: isDarkMode),
                       const SizedBox(height: 14),
-                      _buildInfoRow('Delivery Fee', '${deliveryFee.toStringAsFixed(2)} EGP', bodySize),
+                      _buildInfoRow('Delivery Fee', '${deliveryFee.toStringAsFixed(2)} EGP', bodySize,
+                          isDarkMode: isDarkMode),
                       const SizedBox(height: 14),
-                      _buildInfoRow('Driver', driverName, bodySize),
+                      _buildInfoRow('Driver', driverName, bodySize, isDarkMode: isDarkMode),
                       const SizedBox(height: 20),
-                      Container(height: 1, color: const Color(0xFFE8DCCF)),
+                      Container(height: 1, color: dividerColor),
                       const SizedBox(height: 20),
                       _buildInfoRow('Estimated Delivery', estimatedDelivery, bodySize,
-                          valueColor: const Color(0xFF4CAF50)),
+                          valueColor: const Color(0xFF4CAF50), isDarkMode: isDarkMode),
                       const SizedBox(height: 14),
                       _buildInfoRow('Arrives At', estimatedArrivalClock, bodySize,
-                          valueColor: const Color(0xFF4CAF50)),
+                          valueColor: const Color(0xFF4CAF50), isDarkMode: isDarkMode),
                     ],
                   ),
                 ),
@@ -2375,7 +2451,7 @@ class OrderSuccessScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: bodySize * 0.85,
-                    color: const Color(0xFFA08F7E),
+                    color: footerColor,
                   ),
                 ),
               ],
@@ -2386,7 +2462,15 @@ class OrderSuccessScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, double fontSize, {Color? valueColor}) {
+  Widget _buildInfoRow(
+      String label,
+      String value,
+      double fontSize, {
+        Color? valueColor,
+        bool isDarkMode = false,
+      }) {
+    final labelColor = isDarkMode ? const Color(0xFFBEBEBE) : const Color(0xFF8B7355);
+    final resolvedValueColor = valueColor ?? (isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF2C1810));
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -2394,7 +2478,7 @@ class OrderSuccessScreen extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: fontSize,
-            color: const Color(0xFF8B7355),
+            color: labelColor,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -2403,7 +2487,7 @@ class OrderSuccessScreen extends StatelessWidget {
           style: TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w600,
-            color: valueColor ?? const Color(0xFF2C1810),
+            color: resolvedValueColor,
           ),
         ),
       ],
@@ -2555,22 +2639,28 @@ class MyOrdersScreen extends StatelessWidget {
   }
 
   @override
+  // Builds the UI layout and visual structure for this widget.
   Widget build(BuildContext context) {
     final userId = _currentUserId;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldColor = isDarkMode ? const Color(0xFF121212) : _background;
+    final cardColor = isDarkMode ? const Color(0xFF232323) : Colors.white;
+    final primaryText = isDarkMode ? const Color(0xFFF2F2F2) : _brown;
+    final secondaryText = isDarkMode ? const Color(0xFFBEBEBE) : _muted;
 
     return Scaffold(
-      backgroundColor: _background,
+      backgroundColor: scaffoldColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_ios, color: _brown, size: 20),
+          icon: Icon(Icons.arrow_back_ios, color: primaryText, size: 20),
         ),
-        title: const Text(
+        title: Text(
           'My Orders',
           style: TextStyle(
-            color: _brown,
+            color: primaryText,
             fontSize: 24,
             fontWeight: FontWeight.w700,
           ),
@@ -2578,10 +2668,10 @@ class MyOrdersScreen extends StatelessWidget {
         centerTitle: true,
       ),
       body: userId == null
-          ? const Center(
+          ? Center(
         child: Text(
           'Please sign in to view your orders.',
-          style: TextStyle(color: _muted, fontSize: 15),
+          style: TextStyle(color: secondaryText, fontSize: 15),
         ),
       )
           : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -2601,13 +2691,13 @@ class MyOrdersScreen extends StatelessWidget {
           }
 
           if (snapshot.hasError) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
                 child: Text(
                   'Could not load your orders. Please try again.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: _muted),
+                  style: TextStyle(color: secondaryText),
                 ),
               ),
             );
@@ -2615,13 +2705,13 @@ class MyOrdersScreen extends StatelessWidget {
 
           final docs = snapshot.data?.docs ?? [];
           if (docs.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
                 child: Text(
                   'No orders yet. Your completed orders will appear here.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: _muted, fontSize: 15),
+                  style: TextStyle(color: secondaryText, fontSize: 15),
                 ),
               ),
             );
@@ -2642,7 +2732,7 @@ class MyOrdersScreen extends StatelessWidget {
                 margin: const EdgeInsets.only(bottom: 14),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: cardColor,
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
@@ -2660,8 +2750,8 @@ class MyOrdersScreen extends StatelessWidget {
                         Expanded(
                           child: Text(
                             data['orderId']?.toString() ?? docs[index].id,
-                            style: const TextStyle(
-                              color: _brown,
+                            style: TextStyle(
+                              color: primaryText,
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                             ),
@@ -2687,7 +2777,7 @@ class MyOrdersScreen extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       _formatOrderDate(data),
-                      style: const TextStyle(color: _muted, fontSize: 12),
+                      style: TextStyle(color: secondaryText, fontSize: 12),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -2697,8 +2787,8 @@ class MyOrdersScreen extends StatelessWidget {
                         Expanded(
                           child: Text(
                             '${items.length} items • ${_formatMoney(data['total'])}',
-                            style: const TextStyle(
-                              color: _brown,
+                            style: TextStyle(
+                              color: primaryText,
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
@@ -2717,7 +2807,7 @@ class MyOrdersScreen extends StatelessWidget {
                             delivery['address']?.toString() ?? 'Saved delivery address',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: _muted, fontSize: 12),
+                            style: TextStyle(color: secondaryText, fontSize: 12),
                           ),
                         ),
                       ],

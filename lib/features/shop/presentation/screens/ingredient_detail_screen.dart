@@ -232,14 +232,20 @@ class _IngredientDetailScreenState extends State<IngredientDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldColor = isDarkMode ? const Color(0xFF121212) : const Color(0xFFFFFAF4);
+    final cardColor = isDarkMode ? const Color(0xFF232323) : Colors.white;
+    final borderColor = isDarkMode ? const Color(0xFF444444) : const Color(0xFFE2C9A4);
+    final primaryText = isDarkMode ? const Color(0xFFF2F2F2) : _brown;
+    final secondaryText = isDarkMode ? const Color(0xFFBEBEBE) : _mutedBrown;
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFAF4),
+      backgroundColor: scaffoldColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFFFFAF4),
+        backgroundColor: scaffoldColor,
         elevation: 0,
         leading: IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_ios, color: _brown),
+          icon: Icon(Icons.arrow_back_ios, color: primaryText),
         ),
       ),
       body: Column(
@@ -254,7 +260,7 @@ class _IngredientDetailScreenState extends State<IngredientDetailScreen> {
                       height: 250,
                       width: 250,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardColor,
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
@@ -287,9 +293,13 @@ class _IngredientDetailScreenState extends State<IngredientDetailScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
-                            color: _cream,
+                            color: isDarkMode ? const Color(0xFF2A2A2A) : _cream,
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: _orangeDark.withOpacity(0.3)),
+                            border: Border.all(
+                              color: isDarkMode
+                                  ? const Color(0xFF4A4A4A)
+                                  : _orangeDark.withOpacity(0.3),
+                            ),
                           ),
                           child: Text(
                             widget.ingredient.category.toUpperCase(),
@@ -303,8 +313,8 @@ class _IngredientDetailScreenState extends State<IngredientDetailScreen> {
                         const SizedBox(height: 12),
                         Text(
                           widget.ingredient.name,
-                          style: const TextStyle(
-                            color: _brown,
+                          style: TextStyle(
+                            color: primaryText,
                             fontSize: 28,
                             fontWeight: FontWeight.w700,
                             letterSpacing: -0.5,
@@ -316,23 +326,31 @@ class _IngredientDetailScreenState extends State<IngredientDetailScreen> {
                           style: const TextStyle(color: _green, fontSize: 22, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           'Fresh, high-quality ingredient selected for your kitchen. Great for everyday meals and recipe planning.',
-                          style: TextStyle(color: _mutedBrown, fontSize: 14, height: 1.4),
+                          style: TextStyle(
+                            color: secondaryText,
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
                         ),
                         const SizedBox(height: 24),
                         if (_isInCart) ...[
-                          const Text(
+                          Text(
                             'Quantity',
-                            style: TextStyle(color: _brown, fontSize: 16, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              color: primaryText,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: cardColor,
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFFE2C9A4), width: 1.4),
+                              border: Border.all(color: borderColor, width: 1.4),
                             ),
                             child: Row(
                               children: [
@@ -352,8 +370,8 @@ class _IngredientDetailScreenState extends State<IngredientDetailScreen> {
                                       suffixText: _currentUnitLabel.isEmpty ? null : _currentUnitLabel,
                                       border: InputBorder.none,
                                     ),
-                                    style: const TextStyle(
-                                      color: _brown,
+                                    style: TextStyle(
+                                      color: primaryText,
                                       fontSize: 18,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -371,20 +389,24 @@ class _IngredientDetailScreenState extends State<IngredientDetailScreen> {
                             _isBreadIngredient
                                 ? 'Current quantity: ${_formatReadableQuantity(_quantity)}. Edit it here to update your cart.'
                                 : 'Current quantity: ${_formatReadableQuantity(_quantity)}. Use + / - or type a quantity here to update your cart.',
-                            style: const TextStyle(color: _mutedBrown, fontSize: 12),
+                            style: TextStyle(color: secondaryText, fontSize: 12),
                           ),
                         ] else ...[
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: cardColor,
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: const Color(0xFFE2C9A4)),
+                              border: Border.all(color: borderColor),
                             ),
-                            child: const Text(
+                            child: Text(
                               'Add this ingredient first, then you can edit its quantity here.',
-                              style: TextStyle(color: _mutedBrown, fontSize: 13, fontWeight: FontWeight.w600),
+                              style: TextStyle(
+                                color: secondaryText,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ],
@@ -399,7 +421,7 @@ class _IngredientDetailScreenState extends State<IngredientDetailScreen> {
           Container(
             padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cardColor,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               boxShadow: [
                 BoxShadow(

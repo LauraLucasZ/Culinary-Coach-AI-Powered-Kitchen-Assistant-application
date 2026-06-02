@@ -1,6 +1,7 @@
 // lib/features/my_recipes/presentation/screens/my_recipes_screen.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/core/widgets/current_user_avatar.dart';
 import 'package:culinary_coach_app/features/home/data/models/recipe_match.dart';
 import 'package:culinary_coach_app/features/home/data/services/favorite_recipes_service.dart';
@@ -797,6 +798,10 @@ class _MyRecipesHero extends StatelessWidget {
     final isLandscape = MediaQuery.orientationOf(context) == Orientation.landscape;
     final isCompact = isLandscape;
     final heroTitleSize = isCompact ? 16.0 : 23.0;
+    final searchBg = isDarkMode ? const Color(0xFF2A2A2A) : Colors.white;
+    final searchHintColor = isDarkMode
+        ? const Color(0xFF9A9A9A)
+        : const Color(0xFF888888);
 
     return StreamBuilder<DocumentSnapshot>(
       stream: currentUser == null ? null : FirebaseFirestore.instance.collection('users').doc(currentUser.uid).snapshots(),
@@ -920,38 +925,46 @@ class _MyRecipesHero extends StatelessWidget {
                     height: isCompact ? 40 : 50,
                     padding: const EdgeInsets.only(left: 16, right: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: searchBg,
                       borderRadius: BorderRadius.circular(27),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.12),
+                          color: Colors.black.withValues(alpha: isDarkMode ? 0.35 : 0.12),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
                       ],
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
                         Icon(
                           Icons.search_rounded,
-                          color: Color(0xFF888888),
+                          color: searchHintColor,
                           size: 28,
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Search saved recipes',
                             style: TextStyle(
-                              color: Color(0xFF9A9A9A),
+                              color: searchHintColor,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
-                        Icon(
-                          Icons.tune_rounded,
-                          color: Color(0xFF4D4D4D),
-                          size: 26,
+                        Container(
+                          height: 38,
+                          width: 38,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.primary.withValues(alpha: 0.14),
+                          ),
+                          child: const Icon(
+                            Icons.tune_rounded,
+                            color: AppColors.primaryDeep,
+                            size: 24,
+                          ),
                         ),
                       ],
                     ),

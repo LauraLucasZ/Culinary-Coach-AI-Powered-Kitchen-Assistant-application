@@ -24,6 +24,7 @@ class RecipeDetailsScreen extends StatefulWidget {
 }
 
 class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
+  // manages one recipe details page including servings, favorites, and missing ingredient actions
   static const String _spoonacularKey = String.fromEnvironment(
     'SPOONACULAR_API_KEY',
   );
@@ -52,6 +53,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
   }
 
   Future<void> _loadDetails() async {
+    // upgrades basic recipe payload with full api details when available
     if (_spoonacularKey.isEmpty || _recipe.id == 0) return;
     setState(() => _isLoading = true);
 
@@ -82,6 +84,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     required String userId,
     required bool isFavorite,
   }) async {
+    // optimistic favorite update so heart state changes immediately in ui
     if (_recipe.id <= 0) return;
     final nextValue = !isFavorite;
     setState(() => _favoriteOverrides[_recipe.id] = nextValue);
@@ -117,6 +120,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     String userId, {
     bool showFeedback = true,
   }) async {
+    // stores current recipe in user history before or during key navigation actions
     if (_recipe.id <= 0 || _isSavingToHistory) return;
     setState(() => _isSavingToHistory = true);
     try {
@@ -147,6 +151,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
   }
 
   Future<void> _openStartCookingFlow() async {
+    // ensures history save attempt then opens start cooking flow screen
     if (_isSavingToHistory) return;
 
     final userId = FirebaseAuth.instance.currentUser?.uid;
@@ -187,6 +192,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
   }
 
   Map<String, RecipeIngredient> _missingIngredientDetailsByKey() {
+    // maps missing ingredient names to rich ingredient detail objects for quantity/cart use
     final byKey = <String, RecipeIngredient>{};
     if (_recipe.ingredientDetails.isEmpty) return byKey;
     final missingKeys = _missingIngredientNames()
@@ -252,6 +258,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
   }
 
   Future<void> _addMissingIngredientsToCart(String userId) async {
+    // matches missing ingredients with shop ingredients then writes selected ones to cart
     final missing = _missingIngredientNames();
     if (missing.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -409,6 +416,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // combines favorite stream + recipe state to render details and actions in sync
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
