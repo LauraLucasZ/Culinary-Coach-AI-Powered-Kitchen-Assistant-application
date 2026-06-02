@@ -966,6 +966,53 @@ class CommunityRepository {
   /// Creates a story document (base64 image via [encodeCommunityPostImagesForFirestore]).
   // --- Stories (24h expiry, rings on Community, archive on profile) ---
 
+  // This creates a story with multiple photos and saved text style values.
+  Future<String> createStoryFull({
+    required List<XFile> images,
+    required String textOverlay,
+    required int textColorValue,
+    required double textSize,
+    required double textPosX,
+    required double textPosY,
+  }) async {
+    final viewer = _requireUser;
+    final viewerData = await getUser(viewer.uid);
+    final storyRef = storiesCol().doc();
+
+    // This converts the selected photos to Base64 so they can be stored in Firestore.
+    final encoded = await encodeCommunityPostImagesForFirestore(images);
+    if (encoded.isEmpty) {
+      throw StateError(
+        'Could not process the photo. Try again or pick a different image.',
+      );
+    }
+
+    final created = DateTime.now();
+    final expires = created.add(const Duration(hours: 24));
+    final nowTs = Timestamp.fromDate(created);
+    final expiresTs = Timestamp.fromDate(expires);
+
+    // This saves the story document with photos, text, and style values.
+    await storyRef.set({
+      'userId': viewer.uid.trim(),
+      'userName': viewerData?.displayName ?? (viewer.displayName ?? 'User'),
+      'userAvatar': viewerData?.profileImageUrl ?? viewer.photoURL,
+      'imageBase64': encoded.first,
+      'imageBase64List': encoded,
+      'textOverlay': textOverlay,
+      'textColorValue': textColorValue,
+      'textSize': textSize,
+      'textPosX': textPosX,
+      'textPosY': textPosY,
+      'createdAt': nowTs,
+      'expiresAt': expiresTs,
+      'likedBy': <String>[],
+      'archived': true,
+    });
+
+    return storyRef.id;
+  }
+
   Future<String> createStory({
     required XFile image,
     required String textOverlay,
@@ -991,7 +1038,14 @@ class CommunityRepository {
       'userName': viewerData?.displayName ?? (viewer.displayName ?? 'User'),
       'userAvatar': viewerData?.profileImageUrl ?? viewer.photoURL,
       'imageBase64': encoded.first,
+      // This stores the story photos as a list, so the owner can edit them later.
+      'imageBase64List': [encoded.first],
       'textOverlay': textOverlay,
+      // This stores default story text style values if the UI did not customize them.
+      'textColorValue': 0xFFFFFFFF,
+      'textSize': 20.0,
+      'textPosX': 0.5,
+      'textPosY': 0.75,
       'createdAt': nowTs,
       'expiresAt': expiresTs,
       'likedBy': <String>[],
@@ -1215,6 +1269,50 @@ class CommunityRepository {
       if (ownerId.isEmpty || ownerId != viewer.uid) return;
       tx.update(storyRef, {
         'textOverlay': trimmed,
+        'updatedAt': now,
+      });
+    });
+  }
+
+  // This updates the full story content after the owner edits it (photos + text + style).
+  Future<void> updateStoryFull({
+    required String storyId,
+    required String textOverlay,
+    required List<String> imageBase64List,
+    required int textColorValue,
+    required double textSize,
+    required double textPosX,
+    required double textPosY,
+  }) async {
+    final viewer = _requireUser;
+    final storyRef = storiesCol().doc(storyId.trim());
+    final now = Timestamp.now();
+
+    // This removes empty strings so Firestore does not store broken images.
+    final cleaned = imageBase64List
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (cleaned.isEmpty) return;
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(storyRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+
+      // This blocks editing if the current user is not the story owner.
+      final ownerId = (data['userId'] as String?)?.trim() ?? '';
+      if (ownerId.isEmpty || ownerId != viewer.uid) return;
+
+      // This saves the edited photos and text style values into the story doc.
+      tx.update(storyRef, {
+        'imageBase64': cleaned.first,
+        'imageBase64List': cleaned,
+        'textOverlay': textOverlay,
+        'textColorValue': textColorValue,
+        'textSize': textSize,
+        'textPosX': textPosX,
+        'textPosY': textPosY,
         'updatedAt': now,
       });
     });

@@ -129,6 +129,32 @@ class _EditPostScreenState extends State<EditPostScreen> {
     }
   }
 
+  // This lets the user replace one existing Base64 photo with a new gallery photo.
+  Future<void> _replaceExistingAt(int index) async {
+    final ok = await _ensureGalleryPermission();
+    if (!ok || !mounted) return;
+    try {
+      final file = await _picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+        maxWidth: 1600,
+      );
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      final encoded = base64Encode(bytes);
+      setState(() {
+        _existingBase64[index] =
+            _ExistingBase64Image(base64: encoded, bytes: bytes);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not replace this photo.')),
+      );
+    }
+  }
+
   // This removes one existing Base64 photo from the "kept" list.
   void _removeExistingAt(int index) {
     setState(() => _existingBase64.removeAt(index));
@@ -307,6 +333,52 @@ class _EditPostScreenState extends State<EditPostScreen> {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(16),
                           child: preview,
+                        ),
+                      // This opens a small menu so the user can replace an existing photo quickly.
+                      if (isExisting)
+                        Positioned(
+                          bottom: 4,
+                          left: 4,
+                          child: Material(
+                            color: (isDarkMode
+                                    ? const Color(0xFF1E1E1E)
+                                    : Colors.white)
+                                .withValues(alpha: 0.92),
+                            borderRadius: BorderRadius.circular(999),
+                            child: InkWell(
+                              onTap: _saving ? null : () => _replaceExistingAt(index),
+                              borderRadius: BorderRadius.circular(999),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.swap_horiz_rounded,
+                                      size: 16,
+                                      color: AppColors.primaryDeep,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Replace',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                            color: isDarkMode
+                                                ? const Color(0xFFF2F2F2)
+                                                : AppColors.textPrimary,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                         Positioned(
                           top: 4,

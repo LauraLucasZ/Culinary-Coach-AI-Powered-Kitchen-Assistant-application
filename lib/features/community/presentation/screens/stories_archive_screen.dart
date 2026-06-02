@@ -153,8 +153,34 @@ class StoriesArchiveScreen extends StatelessWidget {
                           child: SizedBox(
                             width: 72,
                             height: 72,
+                            // This renders the saved story text style on top of the thumbnail.
                             child: thumb != null
-                                ? Image.memory(thumb, fit: BoxFit.cover)
+                                ? Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Image.memory(thumb, fit: BoxFit.cover),
+                                      if (s.textOverlay.trim().isNotEmpty)
+                                        Positioned(
+                                          left: (s.textPosX.clamp(0.0, 1.0)) * 72,
+                                          top: (s.textPosY.clamp(0.0, 1.0)) * 72,
+                                          child: Text(
+                                            s.textOverlay,
+                                            style: TextStyle(
+                                              color: Color(s.textColorValue),
+                                              fontSize: (s.textSize * 0.5).clamp(8.0, 14.0),
+                                              fontWeight: FontWeight.w800,
+                                              shadows: const [
+                                                Shadow(
+                                                  offset: Offset(0, 1),
+                                                  blurRadius: 6,
+                                                  color: Colors.black54,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  )
                                 : Container(
                                     color: isDarkMode
                                         ? const Color(0xFF1E1E1E)

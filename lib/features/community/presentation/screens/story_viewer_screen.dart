@@ -8,6 +8,7 @@ import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/core/widgets/app_default_user_avatar.dart';
 import 'package:culinary_coach_app/features/community/data/models/community_story.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
+import 'package:culinary_coach_app/features/community/presentation/screens/edit_story_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -337,19 +338,35 @@ class _StorySlide extends StatelessWidget {
           );
         }
 
-        final bytes = _decode(story.imageBase64);
+        // This reads all story photos, but we still handle old stories with a single image.
+        final images = story.imageBase64List.isNotEmpty
+            ? story.imageBase64List
+            : (story.imageBase64.trim().isNotEmpty ? [story.imageBase64] : const <String>[]);
+        // This is the first decoded photo; we keep it as a quick existence check.
+        final firstBytes = _decode(images.isNotEmpty ? images.first : story.imageBase64);
         final liked = story.likedByUid(viewer?.uid);
         final count = story.likeCount;
         final isOwner = (viewer?.uid ?? '').trim() == story.userId.trim();
 
+        // This rebuilds the text color from the saved ARGB int.
+        final overlayColor = Color(story.textColorValue);
+
         return Stack(
           fit: StackFit.expand,
           children: [
-            if (bytes != null)
-              Image.memory(
-                bytes,
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
+            // This shows the story photo(s). If there are multiple photos, the user can swipe.
+            if (images.isNotEmpty && firstBytes != null)
+              PageView.builder(
+                itemCount: images.length,
+                itemBuilder: (context, i) {
+                  final b = _decode(images[i]);
+                  if (b == null) return Container(color: AppColors.darkPanel);
+                  return Image.memory(
+                    b,
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                  );
+                },
               )
             else
               Container(color: AppColors.darkPanel),
@@ -367,6 +384,44 @@ class _StorySlide extends StatelessWidget {
                 ),
               ),
             ),
+            // This draws the story text over the photo using the saved style values.
+            if (story.textOverlay.trim().isNotEmpty)
+              Positioned.fill(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final w = constraints.maxWidth;
+                    final h = constraints.maxHeight;
+                    return Stack(
+                      children: [
+                        Positioned(
+                          left: (story.textPosX.clamp(0.0, 1.0)) * w,
+                          top: (story.textPosY.clamp(0.0, 1.0)) * h,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            child: Text(
+                              story.textOverlay,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: overlayColor,
+                                fontWeight: FontWeight.w800,
+                                fontSize: story.textSize.clamp(12.0, 44.0),
+                                height: 1.3,
+                                shadows: const [
+                                  Shadow(
+                                    offset: Offset(0, 1),
+                                    blurRadius: 8,
+                                    color: Colors.black54,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(8, _kStoryProgressUnderSafe, 8, 12),
@@ -391,74 +446,12 @@ class _StorySlide extends StatelessWidget {
                             surfaceTintColor: Colors.transparent,
                             onSelected: (v) async {
                               if (v == 'edit') {
-                                final controller =
-                                    TextEditingController(text: story.textOverlay);
-                                final newText = await showDialog<String>(
-                                  context: context,
-                                  builder: (ctx) {
-                                    return AlertDialog(
-                                      backgroundColor: const Color(0xFF2C2C2C),
-                                      surfaceTintColor: Colors.transparent,
-                                      title: const Text(
-                                        'Edit Story',
-                                        style: TextStyle(
-                                          color: Color(0xFFF2F2F2),
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                      content: TextField(
-                                        controller: controller,
-                                        minLines: 2,
-                                        maxLines: 6,
-                                        cursorColor: AppColors.primaryDeep,
-                                        decoration: InputDecoration(
-                                          hintText: 'Update your story...',
-                                          hintStyle: const TextStyle(
-                                            color: Color(0xFF9A9A9A),
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          filled: true,
-                                          fillColor: const Color(0xFF1E1E1E),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(14),
-                                            borderSide: const BorderSide(
-                                              color: Color(0xFF444444),
-                                            ),
-                                          ),
-                                          focusedBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(14),
-                                            borderSide: const BorderSide(
-                                              color: AppColors.primaryDeep,
-                                            ),
-                                          ),
-                                        ),
-                                        style: const TextStyle(
-                                          color: Color(0xFFF2F2F2),
-                                          fontWeight: FontWeight.w600,
-                                          height: 1.35,
-                                        ),
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.of(ctx).pop(),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(ctx).pop(controller.text),
-                                          child: const Text('Save'),
-                                        ),
-                                      ],
-                                    );
-                                  },
+                                // This opens the full story editor (photos + text + style).
+                                await Navigator.of(context).push<bool>(
+                                  MaterialPageRoute<bool>(
+                                    builder: (_) => EditStoryScreen(story: story),
+                                  ),
                                 );
-                                if (newText == null) return;
-                                try {
-                                  await repo.updateStoryTextOverlay(
-                                    storyId: story.id,
-                                    textOverlay: newText,
-                                  );
-                                } catch (_) {}
                               }
                               if (v == 'delete') {
                                 final ok = await showDialog<bool>(
@@ -590,27 +583,6 @@ class _StorySlide extends StatelessWidget {
                       ],
                     ),
                     const Spacer(),
-                    if (story.textOverlay.trim().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: Text(
-                          story.textOverlay,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 20,
-                            height: 1.3,
-                            shadows: [
-                              Shadow(
-                                offset: Offset(0, 1),
-                                blurRadius: 8,
-                                color: Colors.black54,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
