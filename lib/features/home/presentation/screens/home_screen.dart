@@ -29,6 +29,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // keeps the main home state for pantry recipes, random recipes, and filter values
   final IngredientService _ingredientService = IngredientService();
   final FavoriteRecipesService _favoriteRecipesService =
       FavoriteRecipesService();
@@ -191,6 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _applyRecipeApiFilters(Map<String, String> params) {
+    // converts local filter choices into spoonacular query parameters
     if (_selectedMealType != 'Any')
       params['type'] = _selectedMealType.toLowerCase();
     if (_selectedCuisine != 'Any') params['cuisine'] = _selectedCuisine;
@@ -228,6 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
     String value,
     List<SavedIngredientSelection> selections,
   ) {
+    // uses debounce so api calls are not fired on every single keystroke
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 550), () {
       if (mounted) _findMatchedRecipes(selections);
@@ -235,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshAll(List<SavedIngredientSelection> selections) async {
+    // refreshes both lists in parallel so pull-to-refresh feels faster
     await Future.wait([
       _findMatchedRecipes(selections),
       _loadRandomRecipes(force: true),
@@ -242,6 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadRandomRecipes({bool force = false}) async {
+    // loads recommendation cards shown when there is no direct pantry search match
     if (_spoonacularKey.isEmpty) return;
     if (!force && _randomRecipes.isNotEmpty) return;
     if (_isLoadingRandom) return;
@@ -296,6 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _findMatchedRecipes(
     List<SavedIngredientSelection> selections,
   ) async {
+    // central method that decides between name search and pantry-ingredient search
     if (_spoonacularKey.isEmpty) {
       setState(
         () => _errorMessage =
@@ -375,6 +381,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<List<RecipeMatch>> _loadBulkRecipeDetails(
     List<RecipeMatch> recipes,
   ) async {
+    // fetches detailed recipe info in chunks to avoid long url/query limits
     final ids = recipes
         .map((recipe) => recipe.id)
         .where((id) => id > 0)
@@ -445,6 +452,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   bool _passesFilters(RecipeMatch recipe) {
+    // applies all active local filters before rendering cards in home sections
     final allText = [
       recipe.title,
       ...recipe.usedIngredients,
@@ -520,6 +528,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required RecipeMatch recipe,
     required bool isFavorite,
   }) async {
+    // optimistic favorite toggle for instant ui feedback then sync with firestore
     if (recipe.id <= 0) return;
     final nextValue = !isFavorite;
     setState(() => _favoriteOverrides[recipe.id] = nextValue);
@@ -582,6 +591,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String userId,
     required List<SavedIngredientSelection> selectedIngredients,
   }) {
+    // opens pantry dialog with live stream so changes appear without leaving the page
     showDialog(
       context: context,
       builder: (dialogContext) {
@@ -591,9 +601,19 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, snapshot) {
             final currentItems =
                 snapshot.data ?? const <SavedIngredientSelection>[];
+            final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+            final dialogBg = isDarkMode ? const Color(0xFF1E1E1E) : const Color(0xFFFCF7E8);
+            final cardBg = isDarkMode ? const Color(0xFF2A2A2A) : Colors.white;
+            final tilePreviewBg = isDarkMode ? const Color(0xFF1F1F1F) : const Color(0xFFF7F1DE);
+            final primaryText = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF3A2214);
+            final secondaryText = isDarkMode ? const Color(0xFFBEBEBE) : const Color(0xFF8B7355);
+            final borderColor = isDarkMode ? const Color(0xFF3A3A3A) : const Color(0xFFE2C9A4);
+            final statCardBg = isDarkMode
+                ? const Color(0xFFB87313).withValues(alpha: 0.2)
+                : const Color(0xFFD99622).withValues(alpha: 0.12);
 
             return Dialog(
-              backgroundColor: const Color(0xFFFCF7E8),
+              backgroundColor: dialogBg,
               insetPadding: const EdgeInsets.symmetric(
                 horizontal: 18,
                 vertical: 24,
@@ -613,13 +633,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             'Your Pantry',
                             style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF3A2214),
+                              color: primaryText,
                             ),
                           ),
                         ),
@@ -635,17 +655,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD99622).withValues(alpha: 0.12),
+                        color: statCardBg,
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             'Total selected',
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF3A2214),
+                              color: primaryText,
                             ),
                           ),
                           Text(
@@ -660,14 +680,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 12),
                     if (currentItems.isEmpty)
-                      const Flexible(
+                      Flexible(
                         child: Center(
                           child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 36),
+                            padding: const EdgeInsets.symmetric(vertical: 36),
                             child: Text(
                               'Your pantry is empty.',
                               style: TextStyle(
-                                color: Color(0xFF8B7355),
+                                color: secondaryText,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -685,10 +705,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               margin: const EdgeInsets.only(bottom: 10),
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: cardBg,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: const Color(0xFFE2C9A4),
+                                  color: borderColor,
                                 ),
                               ),
                               child: Row(
@@ -697,7 +717,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     width: 52,
                                     height: 52,
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFF7F1DE),
+                                      color: tilePreviewBg,
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: _buildPantryIngredientImage(
@@ -715,19 +735,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ingredient.name,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 15,
                                             fontWeight: FontWeight.w700,
-                                            color: Color(0xFF3A2214),
+                                            color: primaryText,
                                           ),
                                         ),
                                         Text(
                                           ingredient.category,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
-                                            color: Color(0xFF8B7355),
+                                            color: secondaryText,
                                           ),
                                         ),
                                       ],
@@ -802,14 +822,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openFilterSheet(List<SavedIngredientSelection> selectedIngredients) {
+    // opens the home filter bottom sheet and updates list state in real time
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDarkMode ? const Color(0xFF121212) : const Color(0xFFFCF7E8);
+    final topActionBg = isDarkMode ? const Color(0xFF232323) : Colors.white;
+    final topActionBorder = isDarkMode ? const Color(0xFF3A3A3A) : const Color(0xFFE2C9A4);
+    final primaryText = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF3A2214);
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFFFCF7E8),
+      backgroundColor: sheetBg,
       isScrollControlled: true,
+      useSafeArea: true,
+      enableDrag: true,
+      isDismissible: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             void refresh() {
@@ -834,15 +863,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       Row(
                         children: [
                           GestureDetector(
-                            onTap: () => Navigator.pop(context),
+                            onTap: () => Navigator.of(sheetContext).pop(),
                             child: Container(
                               width: 38,
                               height: 38,
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: topActionBg,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: const Color(0xFFE2C9A4),
+                                  color: topActionBorder,
                                 ),
                               ),
                               child: const Icon(
@@ -852,11 +881,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'Recipe Filters',
                               style: TextStyle(
-                                color: Color(0xFF3A2214),
+                                color: primaryText,
                                 fontSize: 22,
                                 fontWeight: FontWeight.w900,
                               ),
@@ -891,6 +920,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _BottomSwitchTile(
                         title: 'Missing one ingredient only',
                         value: _missingOneOnly,
+                        isDarkMode: isDarkMode,
                         onChanged: (value) {
                           _missingOneOnly = value;
                           refresh();
@@ -900,6 +930,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _BottomSliderTile(
                         title: 'Max missing ingredients',
                         value: _maxMissingIngredients,
+                        isDarkMode: isDarkMode,
                         onChanged: (value) {
                           _maxMissingIngredients = value;
                           refresh();
@@ -909,6 +940,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _BottomChoiceSection(
                         title: 'Meal type',
                         selected: _selectedMealType,
+                        isDarkMode: isDarkMode,
                         values: const [
                           'Any',
                           'Breakfast',
@@ -926,6 +958,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _BottomChoiceSection(
                         title: 'Cuisines',
                         selected: _selectedCuisine,
+                        isDarkMode: isDarkMode,
                         values: const [
                           'Any',
                           'Italian',
@@ -943,6 +976,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _BottomChoiceSection(
                         title: 'Diet',
                         selected: _selectedDiet,
+                        isDarkMode: isDarkMode,
                         values: const [
                           'Any',
                           'Vegetarian',
@@ -959,6 +993,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _BottomChoiceSection(
                         title: 'Recipe time',
                         selected: _selectedRecipeTime,
+                        isDarkMode: isDarkMode,
                         values: const [
                           'Any',
                           'Under 15 min',
@@ -973,6 +1008,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 16),
                       _BottomChoiceSection(
                         title: 'Rating',
+                        isDarkMode: isDarkMode,
                         selected: _minRating > 0 ? '4+ Stars' : 'Any',
                         values: const ['Any', '4+ Stars'],
                         onSelected: (value) {
@@ -984,6 +1020,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _IngredientDropdownSection(
                         title: 'Key Ingredient(s)',
                         values: _keyIngredients,
+                        isDarkMode: isDarkMode,
                         availableValues: selectedIngredients
                             .map((item) => item.ingredient.name)
                             .toList(),
@@ -1002,6 +1039,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _IngredientDropdownSection(
                         title: 'Exclude Ingredient(s)',
                         values: _excludedIngredients,
+                        isDarkMode: isDarkMode,
                         availableValues: selectedIngredients
                             .map((item) => item.ingredient.name)
                             .toList(),
@@ -1050,6 +1088,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openSeeMore(String title, List<RecipeMatch> recipes) {
+    // navigates to the dedicated list screen with the currently prepared recipe set
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -2156,6 +2195,7 @@ class _ErrorCard extends StatelessWidget {
 }
 
 class _HomeTopHero extends StatelessWidget {
+  // reusable top header for home with profile, actions, and search bar
   const _HomeTopHero({
     required this.displayName,
     required this.searchController,
@@ -2197,6 +2237,13 @@ class _HomeTopHero extends StatelessWidget {
     final actionIconColor = isDarkMode
         ? Colors.white70
         : const Color(0xFF6C6C6C);
+    final searchBg = isDarkMode ? const Color(0xFF2A2A2A) : Colors.white;
+    final searchHintColor = isDarkMode
+        ? const Color(0xFF9A9A9A)
+        : const Color(0xFF888888);
+    final searchTextColor = isDarkMode
+        ? const Color(0xFFE3E3E3)
+        : const Color(0xFF2F2F2F);
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
@@ -2276,11 +2323,11 @@ class _HomeTopHero extends StatelessWidget {
                 height: isCompact ? 40 : 50,
                 padding: const EdgeInsets.only(left: 16, right: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: searchBg,
                   borderRadius: BorderRadius.circular(27),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.textPrimary.withValues(alpha: 0.12),
+                      color: Colors.black.withValues(alpha: isDarkMode ? 0.35 : 0.12),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -2288,9 +2335,9 @@ class _HomeTopHero extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.search_rounded,
-                      color: Color(0xFF888888),
+                      color: searchHintColor,
                       size: 28,
                     ),
                     const SizedBox(width: 8),
@@ -2299,11 +2346,12 @@ class _HomeTopHero extends StatelessWidget {
                         controller: searchController,
                         onChanged: onSearchChanged,
                         onSubmitted: onSearchSubmitted,
-                        cursorColor: const Color(0xFF6A6A6A),
-                        decoration: const InputDecoration(
+                        cursorColor: searchHintColor,
+                        style: TextStyle(color: searchTextColor),
+                        decoration: InputDecoration(
                           hintText: 'Search',
                           hintStyle: TextStyle(
-                            color: Color(0xFF9A9A9A),
+                            color: searchHintColor,
                             fontSize: 13,
                           ),
                           border: InputBorder.none,
@@ -2321,18 +2369,27 @@ class _HomeTopHero extends StatelessWidget {
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        IconButton(
-                          onPressed: onFilterTap,
-                          icon: const Icon(
-                            Icons.tune_rounded,
-                            color: Color(0xFF4D4D4D),
-                            size: 24,
+                        InkWell(
+                          onTap: onFilterTap,
+                          borderRadius: BorderRadius.circular(19),
+                          child: Container(
+                            height: 38,
+                            width: 38,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.primary.withValues(alpha: 0.14),
+                            ),
+                            child: const Icon(
+                              Icons.tune_rounded,
+                              color: AppColors.primaryDeep,
+                              size: 24,
+                            ),
                           ),
                         ),
                         if (activeFilterCount > 0)
                           Positioned(
-                            top: 4,
-                            right: 4,
+                            top: -2,
+                            right: -2,
                             child: Container(
                               constraints: const BoxConstraints(
                                 minWidth: 16,
@@ -2431,26 +2488,31 @@ class _BottomSwitchTile extends StatelessWidget {
   const _BottomSwitchTile({
     required this.title,
     required this.value,
+    this.isDarkMode = false,
     required this.onChanged,
   });
   final String title;
   final bool value;
+  final bool isDarkMode;
   final ValueChanged<bool> onChanged;
   @override
   Widget build(BuildContext context) {
+    final tileBg = isDarkMode ? const Color(0xFF232323) : Colors.white;
+    final borderColor = isDarkMode ? const Color(0xFF3A3A3A) : const Color(0xFFE2C9A4);
+    final textColor = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF3A2214);
     return Container(
       padding: const EdgeInsets.only(left: 14, right: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tileBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2C9A4)),
+        border: Border.all(color: borderColor),
       ),
       child: SwitchListTile(
         contentPadding: EdgeInsets.zero,
         title: Text(
           title,
-          style: const TextStyle(
-            color: Color(0xFF3A2214),
+          style: TextStyle(
+            color: textColor,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -2466,27 +2528,33 @@ class _BottomSliderTile extends StatelessWidget {
   const _BottomSliderTile({
     required this.title,
     required this.value,
+    this.isDarkMode = false,
     required this.onChanged,
   });
   final String title;
   final int value;
+  final bool isDarkMode;
   final ValueChanged<int> onChanged;
   @override
   Widget build(BuildContext context) {
+    final tileBg = isDarkMode ? const Color(0xFF232323) : Colors.white;
+    final borderColor = isDarkMode ? const Color(0xFF3A3A3A) : const Color(0xFFE2C9A4);
+    final textColor = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF3A2214);
+    final inactiveColor = isDarkMode ? const Color(0xFF505050) : const Color(0xFFE2C9A4);
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: tileBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2C9A4)),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '$title: $value',
-            style: const TextStyle(
-              color: Color(0xFF3A2214),
+            style: TextStyle(
+              color: textColor,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -2496,7 +2564,7 @@ class _BottomSliderTile extends StatelessWidget {
             max: 5,
             divisions: 5,
             activeColor: const Color(0xFF75A843),
-            inactiveColor: const Color(0xFFE2C9A4),
+            inactiveColor: inactiveColor,
             onChanged: (v) => onChanged(v.round()),
           ),
         ],
@@ -2510,21 +2578,27 @@ class _BottomChoiceSection extends StatelessWidget {
     required this.title,
     required this.selected,
     required this.values,
+    this.isDarkMode = false,
     required this.onSelected,
   });
   final String title;
   final String selected;
   final List<String> values;
+  final bool isDarkMode;
   final ValueChanged<String> onSelected;
   @override
   Widget build(BuildContext context) {
+    final titleColor = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF3A2214);
+    final chipBg = isDarkMode ? const Color(0xFF232323) : Colors.white;
+    final chipBorder = isDarkMode ? const Color(0xFF3A3A3A) : const Color(0xFFE2C9A4);
+    final chipText = isDarkMode ? const Color(0xFFD0D0D0) : const Color(0xFF5C5C66);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
-            color: Color(0xFF3A2214),
+          style: TextStyle(
+            color: titleColor,
             fontSize: 15,
             fontWeight: FontWeight.w900,
           ),
@@ -2543,12 +2617,12 @@ class _BottomChoiceSection extends StatelessWidget {
                   vertical: 9,
                 ),
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFFEDF7E7) : Colors.white,
+                  color: isSelected ? const Color(0xFFEDF7E7) : chipBg,
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
                     color: isSelected
                         ? const Color(0xFF75A843)
-                        : const Color(0xFFE2C9A4),
+                        : chipBorder,
                   ),
                 ),
                 child: Text(
@@ -2556,7 +2630,7 @@ class _BottomChoiceSection extends StatelessWidget {
                   style: TextStyle(
                     color: isSelected
                         ? const Color(0xFF5C8E3E)
-                        : const Color(0xFF5C5C66),
+                        : chipText,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -2575,6 +2649,7 @@ class _IngredientDropdownSection extends StatelessWidget {
     required this.values,
     required this.availableValues,
     required this.emptyText,
+    this.isDarkMode = false,
     required this.onAdd,
     required this.onRemove,
   });
@@ -2583,11 +2658,17 @@ class _IngredientDropdownSection extends StatelessWidget {
   final List<String> values;
   final List<String> availableValues;
   final String emptyText;
+  final bool isDarkMode;
   final ValueChanged<String> onAdd;
   final ValueChanged<String> onRemove;
 
   @override
   Widget build(BuildContext context) {
+    final titleColor = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF3A2214);
+    final fieldBg = isDarkMode ? const Color(0xFF232323) : Colors.white;
+    final fieldBorder = isDarkMode ? const Color(0xFF3A3A3A) : const Color(0xFFE2C9A4);
+    final hintColor = isDarkMode ? const Color(0xFFBEBEBE) : const Color(0xFF8B7355);
+    final itemTextColor = isDarkMode ? const Color(0xFFF2F2F2) : const Color(0xFF3A2214);
     final normalizedSelected = values
         .map((item) => item.toLowerCase().trim())
         .toSet();
@@ -2605,8 +2686,8 @@ class _IngredientDropdownSection extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(
-            color: Color(0xFF3A2214),
+          style: TextStyle(
+            color: titleColor,
             fontSize: 15,
             fontWeight: FontWeight.w900,
           ),
@@ -2615,18 +2696,19 @@ class _IngredientDropdownSection extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: fieldBg,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2C9A4)),
+            border: Border.all(color: fieldBorder),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               isExpanded: true,
               value: null,
+              dropdownColor: fieldBg,
               hint: Text(
                 options.isEmpty ? emptyText : 'Choose from your pantry',
-                style: const TextStyle(
-                  color: Color(0xFF8B7355),
+                style: TextStyle(
+                  color: hintColor,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -2641,8 +2723,8 @@ class _IngredientDropdownSection extends StatelessWidget {
                     item,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFF3A2214),
+                    style: TextStyle(
+                      color: itemTextColor,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -2665,10 +2747,10 @@ class _IngredientDropdownSection extends StatelessWidget {
             return InputChip(
               label: Text(item),
               onDeleted: () => onRemove(item),
-              backgroundColor: Colors.white,
+              backgroundColor: fieldBg,
               deleteIconColor: const Color(0xFFB87313),
-              labelStyle: const TextStyle(
-                color: Color(0xFF3A2214),
+              labelStyle: TextStyle(
+                color: itemTextColor,
                 fontWeight: FontWeight.w700,
               ),
             );

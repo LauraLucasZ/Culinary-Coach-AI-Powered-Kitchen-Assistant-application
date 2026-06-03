@@ -23,6 +23,7 @@ class RecipeListScreen extends StatefulWidget {
 }
 
 class _RecipeListScreenState extends State<RecipeListScreen> {
+  // handles search + local filters + sorting for the see more recipe list page
   final TextEditingController _searchController = TextEditingController();
   final FavoriteRecipesService _favoriteRecipesService =
       FavoriteRecipesService();
@@ -79,6 +80,7 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
   }
 
   List<RecipeMatch> get _filteredRecipes {
+    // computes visible recipes from original list using current search and filter state
     final tokens = _searchTokens(_searchController.text);
     final maxReadyTime = _maxReadyTimeFromFilter();
     final maxCalories = _maxCaloriesFromFilter();
@@ -206,6 +208,7 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
   }
 
   void _openFilterSheet() {
+    // opens advanced filter bottom sheet and applies changes instantly to list preview
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final sheetBackground = isDarkMode
         ? const Color(0xFF1E1E1E)
@@ -425,6 +428,7 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
     required RecipeMatch recipe,
     required bool isFavorite,
   }) async {
+    // optimistic favorite update that syncs card heart state with firestore favorites
     if (recipe.id <= 0) return;
     final nextValue = !isFavorite;
     setState(() => _favoriteOverrides[recipe.id] = nextValue);
@@ -458,6 +462,7 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // renders header, search, chips, and masonry grid based on filtered recipe output
     final recipes = _filteredRecipes;
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
