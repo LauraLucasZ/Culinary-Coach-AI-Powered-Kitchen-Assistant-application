@@ -15,7 +15,10 @@ class CommunityNotification {
     required this.createdAt,
     required this.read,
     this.postId,
+    this.repostId,
     this.storyId,
+    this.commentId,
+    this.replyId,
     this.recipientUserId,
     this.senderUserId,
   });
@@ -29,7 +32,10 @@ class CommunityNotification {
   final DateTime createdAt;
   final bool read;
   final String? postId;
+  final String? repostId;
   final String? storyId;
+  final String? commentId;
+  final String? replyId;
   final String? recipientUserId;
   final String? senderUserId;
 
@@ -57,7 +63,10 @@ class CommunityNotification {
       createdAt: createdAt,
       read: (data['read'] as bool?) ?? false,
       postId: (data['postId'] as String?)?.trim(),
+      repostId: (data['repostId'] as String?)?.trim(),
       storyId: (data['storyId'] as String?)?.trim(),
+      commentId: (data['commentId'] as String?)?.trim(),
+      replyId: (data['replyId'] as String?)?.trim(),
       recipientUserId: (data['recipientUserId'] as String?)?.trim(),
       senderUserId: (senderUserId != null && senderUserId.isNotEmpty)
           ? senderUserId

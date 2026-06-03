@@ -9,8 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // ConsumerWidget is like StatelessWidget but with access to riverpod via ref
-class SmartChefApp extends ConsumerWidget {
-  const SmartChefApp({super.key});
+class CulinaryCoachApp extends ConsumerWidget {
+  const CulinaryCoachApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -18,7 +18,7 @@ class SmartChefApp extends ConsumerWidget {
     // when darkModeProvider changes, MaterialApp rebuilds with new themeMode
     final isDarkMode = ref.watch(darkModeProvider);
     return MaterialApp(
-      title: 'SmartChef',
+      title: 'CulinaryCoach',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
@@ -28,7 +28,7 @@ class SmartChefApp extends ConsumerWidget {
     );
   }
 }
-
+// Auth gate decides whether user sees onboarding or main app
 class _AuthSessionGate extends StatelessWidget {
   const _AuthSessionGate();
 

@@ -40,6 +40,19 @@ class StoriesArchiveScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final pageBg =
+        isDarkMode ? const Color(0xFF121212) : AppColors.background;
+    final cardColor =
+        isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final titleColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+    final secondaryColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+    final mutedColor =
+        isDarkMode ? const Color(0xFF9A9A9A) : AppColors.textMuted;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       return Scaffold(
@@ -59,10 +72,10 @@ class StoriesArchiveScreen extends StatelessWidget {
     final repo = CommunityRepository();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: pageBg,
       appBar: AppBar(
         title: const Text('Stories Archive'),
-        backgroundColor: AppColors.background,
+        backgroundColor: pageBg,
       ),
       body: StreamBuilder<List<CommunityStory>>(
         // Archived/expired stories for the signed-in user from Firestore.
@@ -115,7 +128,7 @@ class StoriesArchiveScreen extends StatelessWidget {
               final s = items[i];
               final thumb = _thumb(s.archiveThumbBase64);
               return Material(
-                color: Colors.white,
+                color: cardColor,
                 borderRadius: BorderRadius.circular(18),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(18),
@@ -140,10 +153,38 @@ class StoriesArchiveScreen extends StatelessWidget {
                           child: SizedBox(
                             width: 72,
                             height: 72,
+                            // This renders the saved story text style on top of the thumbnail.
                             child: thumb != null
-                                ? Image.memory(thumb, fit: BoxFit.cover)
+                                ? Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Image.memory(thumb, fit: BoxFit.cover),
+                                      if (s.textOverlay.trim().isNotEmpty)
+                                        Positioned(
+                                          left: (s.textPosX.clamp(0.0, 1.0)) * 72,
+                                          top: (s.textPosY.clamp(0.0, 1.0)) * 72,
+                                          child: Text(
+                                            s.textOverlay,
+                                            style: TextStyle(
+                                              color: Color(s.textColorValue),
+                                              fontSize: (s.textSize * 0.5).clamp(8.0, 14.0),
+                                              fontWeight: FontWeight.w800,
+                                              shadows: const [
+                                                Shadow(
+                                                  offset: Offset(0, 1),
+                                                  blurRadius: 6,
+                                                  color: Colors.black54,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  )
                                 : Container(
-                                    color: AppColors.surfaceMuted,
+                                    color: isDarkMode
+                                        ? const Color(0xFF1E1E1E)
+                                        : AppColors.surfaceMuted,
                                     alignment: Alignment.center,
                                     child: const Icon(Icons.image_not_supported_outlined),
                                   ),
@@ -157,7 +198,7 @@ class StoriesArchiveScreen extends StatelessWidget {
                               Text(
                                 _dateLabel(s.createdAt),
                                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                      color: AppColors.textMuted,
+                                      color: mutedColor,
                                       fontWeight: FontWeight.w700,
                                     ),
                               ),
@@ -167,7 +208,7 @@ class StoriesArchiveScreen extends StatelessWidget {
                                 maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
                                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: AppColors.textPrimary,
+                                      color: titleColor,
                                       fontWeight: FontWeight.w600,
                                       height: 1.35,
                                     ),
@@ -185,7 +226,7 @@ class StoriesArchiveScreen extends StatelessWidget {
                                     '${s.likeCount}',
                                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                                           fontWeight: FontWeight.w800,
-                                          color: AppColors.textSecondary,
+                                          color: secondaryColor,
                                         ),
                                   ),
                                   if (!s.isActiveAt(DateTime.now())) ...[
@@ -196,14 +237,19 @@ class StoriesArchiveScreen extends StatelessWidget {
                                         vertical: 3,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.surfaceMuted,
+                                        color: isDarkMode
+                                            ? const Color(0xFF1E1E1E)
+                                            : AppColors.surfaceMuted,
                                         borderRadius: BorderRadius.circular(8),
+                                        border: isDarkMode
+                                            ? Border.all(color: borderColor)
+                                            : null,
                                       ),
                                       child: Text(
                                         'Expired',
                                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                               fontWeight: FontWeight.w800,
-                                              color: AppColors.textMuted,
+                                              color: mutedColor,
                                             ),
                                       ),
                                     ),

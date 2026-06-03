@@ -29,21 +29,21 @@ class _OnboardingPageState extends State<OnboardingScreen> {
     _SlideData(
       title: 'Scan Your\nIngredients',
       description:
-          'Use camera scanning or manual selection to detect what is in your kitchen and unlock recipe ideas instantly.',
+      'Use camera scanning or manual selection to detect what is in your kitchen and unlock recipe ideas instantly.',
       imagePath: AppAssets.scanPic,
       blobColor: Color(0xFFCB6B2E),
     ),
     _SlideData(
       title: 'Cook Step\nby Step',
       description:
-          'Start cooking mode with voice guidance, visual cues, and timers so you can pause, resume, skip, or extend any step.',
+      'Start cooking mode with voice guidance, visual cues, and timers so you can pause, resume, skip, or extend any step.',
       imagePath: AppAssets.cookingPic,
       blobColor: Color(0xFF5A9A44),
     ),
     _SlideData(
       title: 'Join the\nFood Community',
       description:
-          'Share your dishes, post history, and engage with other cooks through likes, comments, follows, and inspiration.',
+      'Share your dishes, post history, and engage with other cooks through likes, comments, follows, and inspiration.',
       imagePath: AppAssets.communityPic,
       blobColor: Color(0xFFB85C28),
     ),
@@ -195,7 +195,7 @@ class _SplashSlide extends StatelessWidget {
               children: [
                 Image.asset(AppAssets.smartChefLogo, height: 200, width: 200),
                 Text(
-                  'SmartChef',
+                  'CulinaryCoach',
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFF3A2214),
@@ -244,7 +244,7 @@ class _StorySlide extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
       child: Stack(
         children: [
-          // ── Full-screen card ────────────────────────────────────────────
+          //  Full-screen card
           Positioned.fill(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(32),
@@ -281,7 +281,7 @@ class _StorySlide extends StatelessWidget {
                     left: 0,
                     right: 0,
                     child: Text(
-                      'SmartChef',
+                      'CulinaryCoach',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: Colors.white.withValues(alpha: 0.88),
@@ -346,7 +346,7 @@ class _StorySlide extends StatelessWidget {
             ),
           ),
 
-          // ── Cream notch at bottom-right ─────────────────────────────────
+          //  Cream notch at bottom-right
           // Large circle in background colour bites into the card corner
           Positioned(
             right: -38,
@@ -361,7 +361,7 @@ class _StorySlide extends StatelessWidget {
             ),
           ),
 
-          // ── Arrow chevron ───────────────────────────────────────────────
+          //  Arrow chevron
           Positioned(
             right: 20,
             bottom: 20,
@@ -384,7 +384,7 @@ class _StorySlide extends StatelessWidget {
   }
 }
 
-// ─── Sign-up slide ────────────────────────────────────────────────────────────
+// Sign-up slide
 
 class _SignUpSlide extends StatelessWidget {
   const _SignUpSlide({
@@ -425,7 +425,7 @@ class _SignUpSlide extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  'SmartChef',
+                  'CulinaryCoach',
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: Colors.white.withValues(alpha: 0.88),
                     fontWeight: FontWeight.w600,
@@ -543,7 +543,7 @@ class _SignUpSlide extends StatelessWidget {
   }
 }
 
-// ─── Helper widgets ───────────────────────────────────────────────────────────
+//  Helper widgets
 
 /// Dark, atmospheric gradient that simulates a moody food photograph.
 class _FoodPhoto extends StatelessWidget {
@@ -676,7 +676,7 @@ class _Dot extends StatelessWidget {
   }
 }
 
-// ─── Data model ───────────────────────────────────────────────────────────────
+//  Data model
 
 class _SlideData {
   const _SlideData({

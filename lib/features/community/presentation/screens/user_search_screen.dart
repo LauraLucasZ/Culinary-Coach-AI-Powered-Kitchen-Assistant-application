@@ -33,10 +33,23 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
     final repo = CommunityRepository();
     final viewerUid = FirebaseAuth.instance.currentUser?.uid;
     final q = _query.trim().toLowerCase();
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final pageBg =
+        isDarkMode ? const Color(0xFF121212) : AppColors.background;
+    final cardColor =
+        isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final titleColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+    final secondaryColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+    final mutedColor =
+        isDarkMode ? const Color(0xFF9A9A9A) : AppColors.textMuted;
 
     // Column: search TextField on top, Expanded StreamBuilder list below.
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: pageBg,
       appBar: AppBar(title: const Text('Search Users')),
       body: Column(
         children: [
@@ -45,12 +58,12 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.outline),
+                border: Border.all(color: borderColor),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.textPrimary.withValues(alpha: 0.05),
+                    color: Colors.black.withValues(alpha: isDarkMode ? 0.35 : 0.12),
                     blurRadius: 16,
                     offset: const Offset(0, 10),
                   ),
@@ -58,14 +71,22 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.search_rounded, color: AppColors.textMuted),
+                  Icon(Icons.search_rounded, color: mutedColor),
                   const SizedBox(width: 10),
                   Expanded(
                     child: TextField(
                       controller: _controller,
                       cursorColor: AppColors.primaryDeep,
-                      decoration: const InputDecoration(
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: titleColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                      decoration: InputDecoration(
                         hintText: 'Search users',
+                        hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: mutedColor,
+                              fontWeight: FontWeight.w600,
+                            ),
                         border: InputBorder.none,
                         isDense: true,
                       ),
@@ -79,7 +100,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                         _controller.clear();
                         _query = '';
                       }),
-                      icon: const Icon(Icons.close_rounded),
+                      icon: Icon(Icons.close_rounded, color: mutedColor),
                     ),
                 ],
               ),
@@ -153,13 +174,12 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                       child: Container(
                         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: cardColor,
                           borderRadius: BorderRadius.circular(22),
-                          border: Border.all(color: AppColors.outline),
+                          border: Border.all(color: borderColor),
                           boxShadow: [
                             BoxShadow(
-                              color:
-                                  AppColors.textPrimary.withValues(alpha: 0.06),
+                              color: Colors.black.withValues(alpha: isDarkMode ? 0.24 : 0.06),
                               blurRadius: 16,
                               offset: const Offset(0, 10),
                             ),
@@ -186,7 +206,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                                         .titleMedium
                                         ?.copyWith(
                                           fontWeight: FontWeight.w800,
-                                          color: AppColors.textPrimary,
+                                          color: titleColor,
                                         ),
                                   ),
                                   const SizedBox(height: 4),
@@ -196,7 +216,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                                         .textTheme
                                         .labelLarge
                                         ?.copyWith(
-                                          color: AppColors.textSecondary,
+                                          color: secondaryColor,
                                           fontWeight: FontWeight.w700,
                                         ),
                                   ),
@@ -262,12 +282,19 @@ class _SmallPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final pillBg =
+        isDarkMode ? const Color(0xFF1E1E1E) : AppColors.surfaceMuted;
+    final labelColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
+        color: pillBg,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -278,7 +305,7 @@ class _SmallPill extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textSecondary,
+                  color: labelColor,
                 ),
           ),
         ],
@@ -298,15 +325,24 @@ class _HintEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final cardColor =
+        isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final titleColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+    final subtitleColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Container(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardColor,
             borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppColors.outline),
+            border: Border.all(color: borderColor),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -329,7 +365,7 @@ class _HintEmpty extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                      color: titleColor,
                     ),
               ),
               const SizedBox(height: 6),
@@ -337,7 +373,7 @@ class _HintEmpty extends StatelessWidget {
                 subtitle,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppColors.textSecondary,
+                      color: subtitleColor,
                       fontWeight: FontWeight.w600,
                       height: 1.35,
                     ),

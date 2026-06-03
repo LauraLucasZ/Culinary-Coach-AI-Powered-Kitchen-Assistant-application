@@ -8,6 +8,7 @@ import 'package:culinary_coach_app/app/theme/app_colors.dart';
 import 'package:culinary_coach_app/core/widgets/app_default_user_avatar.dart';
 import 'package:culinary_coach_app/features/community/data/models/community_story.dart';
 import 'package:culinary_coach_app/features/community/data/services/community_repository.dart';
+import 'package:culinary_coach_app/features/community/presentation/screens/edit_story_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -337,14 +338,23 @@ class _StorySlide extends StatelessWidget {
           );
         }
 
-        final bytes = _decode(story.imageBase64);
+        // This story uses one photo, but we still accept older docs that might have a list.
+        final base64 = story.imageBase64.trim().isNotEmpty
+            ? story.imageBase64
+            : (story.imageBase64List.isNotEmpty ? story.imageBase64List.first : '');
+        // This decodes the story photo so we can render it.
+        final bytes = _decode(base64);
         final liked = story.likedByUid(viewer?.uid);
         final count = story.likeCount;
         final isOwner = (viewer?.uid ?? '').trim() == story.userId.trim();
 
+        // This rebuilds the text color from the saved ARGB int.
+        final overlayColor = Color(story.textColorValue);
+
         return Stack(
           fit: StackFit.expand,
           children: [
+            // This shows the story photo, or a dark panel if the photo was deleted.
             if (bytes != null)
               Image.memory(
                 bytes,
@@ -367,6 +377,44 @@ class _StorySlide extends StatelessWidget {
                 ),
               ),
             ),
+            // This draws the story text over the photo using the saved style values.
+            if (story.textOverlay.trim().isNotEmpty)
+              Positioned.fill(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final w = constraints.maxWidth;
+                    final h = constraints.maxHeight;
+                    return Stack(
+                      children: [
+                        Positioned(
+                          left: (story.textPosX.clamp(0.0, 1.0)) * w,
+                          top: (story.textPosY.clamp(0.0, 1.0)) * h,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            child: Text(
+                              story.textOverlay,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: overlayColor,
+                                fontWeight: FontWeight.w800,
+                                fontSize: story.textSize.clamp(12.0, 44.0),
+                                height: 1.3,
+                                shadows: const [
+                                  Shadow(
+                                    offset: Offset(0, 1),
+                                    blurRadius: 8,
+                                    color: Colors.black54,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(8, _kStoryProgressUnderSafe, 8, 12),
@@ -380,6 +428,116 @@ class _StorySlide extends StatelessWidget {
                           icon: const Icon(Icons.close_rounded, color: Colors.white),
                         ),
                         const Spacer(),
+                        if (isOwner)
+                          PopupMenuButton<String>(
+                            tooltip: 'Story options',
+                            icon: const Icon(
+                              Icons.more_horiz_rounded,
+                              color: Colors.white,
+                            ),
+                            color: const Color(0xFF2C2C2C),
+                            surfaceTintColor: Colors.transparent,
+                            onSelected: (v) async {
+                              if (v == 'edit') {
+                                // This opens the full story editor (photos + text + style).
+                                await Navigator.of(context).push<bool>(
+                                  MaterialPageRoute<bool>(
+                                    builder: (_) => EditStoryScreen(story: story),
+                                  ),
+                                );
+                              }
+                              if (v == 'delete') {
+                                final ok = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) {
+                                    return AlertDialog(
+                                      backgroundColor: const Color(0xFF2C2C2C),
+                                      surfaceTintColor: Colors.transparent,
+                                      title: const Text(
+                                        'Delete Story?',
+                                        style: TextStyle(
+                                          color: Color(0xFFF2F2F2),
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      content: const Text(
+                                        'This will permanently delete your story.',
+                                        style: TextStyle(
+                                          color: Color(0xFFBFBFBF),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(ctx).pop(false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(ctx).pop(true),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor:
+                                                const Color(0xFFFF6B6B),
+                                          ),
+                                          child: const Text('Delete'),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                                if (ok != true) return;
+                                try {
+                                  await repo.deleteStory(storyId: story.id);
+                                  if (context.mounted) {
+                                    Navigator.of(context).pop();
+                                  }
+                                } catch (_) {}
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem<String>(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.edit_rounded,
+                                      color: AppColors.primaryDeep,
+                                      size: 18,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Edit Story',
+                                      style: TextStyle(
+                                        color: Color(0xFFF2F2F2),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem<String>(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.delete_outline_rounded,
+                                      color: Color(0xFFFF6B6B),
+                                      size: 18,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Delete Story',
+                                      style: TextStyle(
+                                        color: Color(0xFFF2F2F2),
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                     Row(
@@ -418,27 +576,6 @@ class _StorySlide extends StatelessWidget {
                       ],
                     ),
                     const Spacer(),
-                    if (story.textOverlay.trim().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: Text(
-                          story.textOverlay,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 20,
-                            height: 1.3,
-                            shadows: [
-                              Shadow(
-                                offset: Offset(0, 1),
-                                blurRadius: 8,
-                                color: Colors.black54,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

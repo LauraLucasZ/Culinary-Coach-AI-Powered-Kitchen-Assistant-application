@@ -196,7 +196,7 @@ class CommunityRepository {
         SetOptions(merge: true),
       );
 
-      final notifRef = notificationsCol(targetUid).doc();
+      final notifRef = notificationsCol(targetUid).doc('follow_$viewerUid');
       tx.set(notifRef, {
         'type': 'follow',
         'fromUid': viewerUid,
@@ -205,6 +205,8 @@ class CommunityRepository {
         'message': '$viewerName started following you.',
         'createdAt': now,
         'read': false,
+        'recipientUserId': targetUid,
+        'senderUserId': viewerUid,
       });
     });
   }
@@ -220,12 +222,15 @@ class CommunityRepository {
     await _firestore.runTransaction((tx) async {
       final followingRef = followingCol(viewerUid).doc(targetUid);
       final followerRef = followersCol(targetUid).doc(viewerUid);
+      final notifRef = notificationsCol(targetUid).doc('follow_$viewerUid');
 
       final existing = await tx.get(followingRef);
       if (!existing.exists) return;
 
       tx.delete(followingRef);
       tx.delete(followerRef);
+      // This removes the notification because the action was undone.
+      tx.delete(notifRef);
 
       tx.set(
         userDoc(targetUid),
@@ -317,6 +322,143 @@ class CommunityRepository {
     return postRef.id;
   }
 
+  Future<void> updatePostCaption({
+    required String postId,
+    required String caption,
+  }) async {
+    final viewer = _requireUser;
+    final postRef = postsCol().doc(postId);
+    final now = Timestamp.now();
+    final trimmed = caption.trim();
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(postRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final authorId = (data['authorId'] as String?)?.trim() ?? '';
+      if (authorId.isEmpty || authorId != viewer.uid) return;
+      tx.update(postRef, {
+        'caption': trimmed,
+        'updatedAt': now,
+      });
+    });
+  }
+
+  Future<void> deletePost({required String postId}) async {
+    final viewer = _requireUser;
+    final postRef = postsCol().doc(postId);
+    final now = Timestamp.now();
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(postRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final authorId = (data['authorId'] as String?)?.trim() ?? '';
+      if (authorId.isEmpty || authorId != viewer.uid) return;
+      tx.delete(postRef);
+      tx.set(
+        userDoc(viewer.uid),
+        {'communityPosts': FieldValue.increment(-1), 'updatedAt': now},
+        SetOptions(merge: true),
+      );
+    });
+  }
+
+  Future<void> deleteRepost({required String repostPostId}) async {
+    final viewer = _requireUser;
+    final repostRef = postsCol().doc(repostPostId.trim());
+    final now = Timestamp.now();
+
+    var originalId = '';
+    var originalAuthorId = '';
+    var repostTargetId = '';
+
+    await _firestore.runTransaction((tx) async {
+      final repostSnap = await tx.get(repostRef);
+      if (!repostSnap.exists) return;
+      final data = repostSnap.data() ?? const <String, dynamic>{};
+
+      // Only the repost owner can delete this document.
+      final authorId = (data['authorId'] as String?)?.trim() ?? '';
+      if (authorId.isEmpty || authorId != viewer.uid) return;
+
+      // Repost documents store a reference to the original post id.
+      originalId = (data['repostOfPostId'] as String?)?.trim() ?? '';
+      originalAuthorId = (data['originalAuthorId'] as String?)?.trim() ?? '';
+      repostTargetId = (data['repostTargetPostId'] as String?)?.trim() ?? '';
+      if (originalId.isEmpty) return;
+
+      // This removes only the repost and keeps the original post.
+      tx.delete(repostRef);
+
+      // Reposts do not count toward communityPosts, so we skip that counter.
+      tx.set(
+        userDoc(viewer.uid),
+        {'updatedAt': now},
+        SetOptions(merge: true),
+      );
+    });
+
+    // The feed updates when Firestore drops the repost from the snapshot.
+
+    // Update repost count and notification when permitted by security rules.
+    final decrementTarget = repostTargetId.isNotEmpty ? repostTargetId : originalId;
+    if (decrementTarget.isNotEmpty) {
+      try {
+        await postsCol()
+            .doc(decrementTarget)
+            .update({'repostCount': FieldValue.increment(-1)});
+      } catch (_) {}
+    }
+    if (originalAuthorId.isNotEmpty && originalAuthorId != viewer.uid) {
+      try {
+        await notificationsCol(originalAuthorId)
+            .doc('post_repost_${originalId}_${viewer.uid}')
+            .delete();
+      } catch (_) {}
+    }
+  }
+
+  // This updates the main post content (caption + photo lists) after the owner edits it.
+  Future<void> updatePostFull({
+    required String postId,
+    required String caption,
+    required List<String> imageUrls,
+    required List<String> imageBase64List,
+  }) async {
+    final viewer = _requireUser;
+    final postRef = postsCol().doc(postId.trim());
+    final now = Timestamp.now();
+
+    // This cleans image lists to avoid saving empty strings to Firestore.
+    final cleanedUrls = imageUrls
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    final cleanedBase64 = imageBase64List
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(postRef);
+      if (!snap.exists) return;
+
+      // This blocks editing if the current user is not the post owner.
+      final data = snap.data() ?? const <String, dynamic>{};
+      final authorId = (data['authorId'] as String?)?.trim() ?? '';
+      if (authorId.isEmpty || authorId != viewer.uid) return;
+
+      // This saves the updated caption and photo lists into the same post document.
+      tx.update(postRef, {
+        'caption': caption.trim(),
+        'imageUrls': cleanedUrls,
+        'imageBase64List': cleanedBase64,
+        'updatedAt': now,
+      });
+    });
+  }
+
   Query<Map<String, dynamic>> queryPostsForUser(String uid) {
     // Avoid composite-index requirements (authorId + createdAt).
     // We'll sort client-side by createdAt for stability.
@@ -324,8 +466,8 @@ class CommunityRepository {
   }
 
   /// Returns a query for the first "page" of feed posts.
-  /// Note: uses whereIn with chunking limit 30 internally by returning multiple queries,
-  /// but for simplicity in UI we provide a single "combined stream" method.
+  /// Uses whereIn with chunking (limit 30) via multiple queries,
+  /// exposed as one combined stream for the feed UI.
   // watchFeedPosts: Stream queries posts collection — UI StreamBuilder rebuilds on changes.
   Stream<List<CommunityPost>> watchFeedPosts({bool includeMyPosts = true}) {
     final viewer = _requireUser;
@@ -412,6 +554,25 @@ class CommunityRepository {
       final posts = snap.docs.map(CommunityPost.fromDoc).toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return posts;
+    });
+  }
+
+  // This reads one post document once, so we can open a post from a notification.
+  Future<CommunityPost?> getPostById(String postId) async {
+    final id = postId.trim();
+    if (id.isEmpty) return null;
+    final snap = await postsCol().doc(id).get();
+    if (!snap.exists) return null;
+    return CommunityPost.fromDoc(snap);
+  }
+
+  // This streams one post document, so the post details screen stays live.
+  Stream<CommunityPost?> watchPostById(String postId) {
+    final id = postId.trim();
+    if (id.isEmpty) return Stream.value(null);
+    return postsCol().doc(id).snapshots().map((d) {
+      if (!d.exists) return null;
+      return CommunityPost.fromDoc(d);
     });
   }
 
@@ -580,12 +741,14 @@ class CommunityRepository {
       });
       tx.update(postRef, {'commentCount': FieldValue.increment(1)});
       if (postAuthorId.isNotEmpty && postAuthorId != viewer.uid) {
-        final notifRef = notificationsCol(postAuthorId).doc();
+        final notifRef = notificationsCol(postAuthorId)
+            .doc('comment_${postId}_${commentRef.id}_${viewer.uid}');
         tx.set(notifRef, {
           'type': 'comment',
           'recipientUserId': postAuthorId,
           'senderUserId': viewer.uid,
           'postId': postId,
+          'commentId': commentRef.id,
           'fromUid': viewer.uid,
           'fromName': senderName,
           'fromProfileImageUrl': senderProfileUrl,
@@ -627,6 +790,58 @@ class CommunityRepository {
     });
   }
 
+  Future<void> updateCommentText({
+    required String postId,
+    required String commentId,
+    required String text,
+  }) async {
+    final viewer = _requireUser;
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    final ref = postsCol().doc(postId).collection('comments').doc(commentId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final ownerUid = (data['uid'] as String?)?.trim() ?? '';
+      // This checks if the current user owns the comment.
+      if (ownerUid.isEmpty || ownerUid != viewer.uid) return;
+      // This saves the edited comment text.
+      tx.update(ref, {'text': trimmed});
+    });
+  }
+
+  Future<void> deleteComment({
+    required String postId,
+    required String commentId,
+  }) async {
+    final viewer = _requireUser;
+    final postRef = postsCol().doc(postId);
+    final ref = postRef.collection('comments').doc(commentId);
+
+    await _firestore.runTransaction((tx) async {
+      final postSnap = await tx.get(postRef);
+      final snap = await tx.get(ref);
+      if (!snap.exists || !postSnap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final ownerUid = (data['uid'] as String?)?.trim() ?? '';
+      // This checks if the current user owns the comment.
+      if (ownerUid.isEmpty || ownerUid != viewer.uid) return;
+      final postAuthorId =
+          (postSnap.data()!['authorId'] as String?)?.trim() ?? '';
+      // This removes the comment (its nested replies are removed with it).
+      tx.delete(ref);
+      tx.update(postRef, {'commentCount': FieldValue.increment(-1)});
+      if (postAuthorId.isNotEmpty && postAuthorId != viewer.uid) {
+        final notifRef = notificationsCol(postAuthorId)
+            .doc('comment_${postId}_${commentId}_${viewer.uid}');
+        // This makes sure only the matching notification is deleted.
+        tx.delete(notifRef);
+      }
+    });
+  }
+
   Future<void> addReply({
     required String postId,
     required String commentId,
@@ -655,31 +870,98 @@ class CommunityRepository {
         viewerData?.displayName ?? (viewer.displayName ?? 'User');
     final senderProfileUrl = viewerData?.profileImageUrl ?? viewer.photoURL;
     await _firestore.runTransaction((tx) async {
-      final postSnap = await tx.get(postRef);
       final snap = await tx.get(ref);
-      if (!postSnap.exists || !snap.exists) return;
-      final postAuthorId =
-          (postSnap.data()!['authorId'] as String?)?.trim() ?? '';
+      if (!snap.exists) return;
       final data = snap.data() ?? {};
       final existing = CommunityReply.listFromField(data['replies']);
       final merged = [...existing, reply];
       tx.update(ref, {
         'replies': merged.map((e) => e.toFirestore()).toList(),
       });
-      if (postAuthorId.isNotEmpty && postAuthorId != viewer.uid) {
-        final notifRef = notificationsCol(postAuthorId).doc();
+
+      final commentOwnerId = (data['uid'] as String?)?.trim() ?? '';
+      // This notifies the comment owner when someone replies.
+      if (commentOwnerId.isNotEmpty && commentOwnerId != viewer.uid) {
+        final notifRef = notificationsCol(commentOwnerId)
+            .doc('reply_${postId}_${commentId}_${replyId}_${viewer.uid}');
         tx.set(notifRef, {
           'type': 'reply',
-          'recipientUserId': postAuthorId,
+          'recipientUserId': commentOwnerId,
           'senderUserId': viewer.uid,
           'postId': postId,
+          'commentId': commentId,
+          'replyId': replyId,
           'fromUid': viewer.uid,
           'fromName': senderName,
           'fromProfileImageUrl': senderProfileUrl,
-          'message': '$senderName replied to a comment on your post',
+          'message': '$senderName replied to your comment',
           'createdAt': now,
           'read': false,
         });
+      }
+    });
+  }
+
+  Future<void> updateReplyText({
+    required String postId,
+    required String commentId,
+    required String replyId,
+    required String text,
+  }) async {
+    final viewer = _requireUser;
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    final ref = postsCol().doc(postId).collection('comments').doc(commentId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final replies = CommunityReply.listFromField(data['replies']);
+      final idx = replies.indexWhere((r) => r.id == replyId);
+      if (idx < 0) return;
+
+      final r = replies[idx];
+      // This checks if the current user owns the reply.
+      if (r.userId.trim().isEmpty || r.userId.trim() != viewer.uid) return;
+
+      final updated = [...replies];
+      // This saves the edited reply text.
+      updated[idx] = r.copyWith(text: trimmed);
+      tx.update(ref, {'replies': updated.map((e) => e.toFirestore()).toList()});
+    });
+  }
+
+  Future<void> deleteReply({
+    required String postId,
+    required String commentId,
+    required String replyId,
+  }) async {
+    final viewer = _requireUser;
+    final ref = postsCol().doc(postId).collection('comments').doc(commentId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final replies = CommunityReply.listFromField(data['replies']);
+      final idx = replies.indexWhere((r) => r.id == replyId);
+      if (idx < 0) return;
+
+      final r = replies[idx];
+      // This checks if the current user owns the reply.
+      if (r.userId.trim().isEmpty || r.userId.trim() != viewer.uid) return;
+
+      final updated = [...replies]..removeAt(idx);
+      // This removes the reply after the user confirms.
+      tx.update(ref, {'replies': updated.map((e) => e.toFirestore()).toList()});
+
+      final commentOwnerId = (data['uid'] as String?)?.trim() ?? '';
+      if (commentOwnerId.isNotEmpty && commentOwnerId != viewer.uid) {
+        final notifRef = notificationsCol(commentOwnerId)
+            .doc('reply_${postId}_${commentId}_${replyId}_${viewer.uid}');
+        // This removes the notification because the action was undone.
+        tx.delete(notifRef);
       }
     });
   }
@@ -731,48 +1013,66 @@ class CommunityRepository {
     final reposterProfileUrl =
         viewerData?.profileImageUrl ?? viewer.photoURL;
 
+    // Resolve the root original post id when reposting a repost.
+    final originalPostId = original.isRepost
+        ? (original.repostOfPostId ?? '').trim()
+        : original.id.trim();
+    if (originalPostId.isEmpty) return;
+
+    // Track the actual post that was reposted (original or repost).
+    final repostTargetPostId = original.id.trim();
+    if (repostTargetPostId.isEmpty) return;
+
+    final originalAuthorId = original.isRepost
+        ? ((original.originalAuthorId ?? '').trim().isNotEmpty
+            ? original.originalAuthorId!.trim()
+            : original.authorId.trim())
+        : original.authorId.trim();
+
     await _firestore.runTransaction((tx) async {
-      final originalRef = postsCol().doc(original.id);
+      final originalRef = postsCol().doc(originalPostId);
       final originalSnap = await tx.get(originalRef);
       if (!originalSnap.exists) return;
 
-      final originalAuthorId =
+      final resolvedAuthorId =
           (originalSnap.data()!['authorId'] as String?)?.trim() ??
-              original.authorId;
+              originalAuthorId;
 
+      // Save a reference to the original post instead of copying its content.
       tx.set(postRef, {
         'authorId': viewer.uid,
         'authorName': viewerData?.displayName ?? (viewer.displayName ?? 'User'),
         'authorProfileImageUrl': viewerData?.profileImageUrl ?? viewer.photoURL,
-        'caption': (caption?.trim().isNotEmpty ?? false) ? caption!.trim() : original.caption,
-        if (original.imageUrls.isNotEmpty) 'imageUrls': original.imageUrls,
-        if (original.imageBase64List.isNotEmpty)
-          'imageBase64List': original.imageBase64List,
-        'recipeTitle': original.recipeTitle,
-        'cookingTime': original.cookingTime,
-        'tags': original.tags,
+        'caption': '',
         'createdAt': now,
         'likeCount': 0,
         'commentCount': 0,
         'repostCount': 0,
-        'repostOfPostId': original.id,
-        'originalAuthorId': original.authorId,
+        'repostOfPostId': originalPostId,
+        'repostTargetPostId': repostTargetPostId,
+        'originalAuthorId': resolvedAuthorId,
       });
-      tx.update(originalRef, {'repostCount': FieldValue.increment(1)});
+      // This increments repost count for the post that was reposted.
+      tx.update(postsCol().doc(repostTargetPostId), {
+        'repostCount': FieldValue.increment(1),
+      });
 
-      if (originalAuthorId.isNotEmpty && originalAuthorId != viewer.uid) {
-        final notifRef = notificationsCol(originalAuthorId)
-            .doc('post_repost_${original.id}_${viewer.uid}');
+      if (resolvedAuthorId.isNotEmpty && resolvedAuthorId != viewer.uid) {
+        final notifRef = notificationsCol(resolvedAuthorId)
+            .doc('post_repost_${originalPostId}_${viewer.uid}');
         tx.set(notifRef, {
           'type': 'post_repost',
-          'postId': original.id,
+          'postId': originalPostId,
+          // This notification opens the repost created by the user.
+          // This helps the original owner see interactions on the repost.
+          'repostId': postRef.id,
           'fromUid': viewer.uid,
           'fromName': reposterName,
           'fromProfileImageUrl': reposterProfileUrl,
           'message': '$reposterName reposted your post',
           'createdAt': now,
           'read': false,
-          'recipientUserId': originalAuthorId,
+          'recipientUserId': resolvedAuthorId,
           'senderUserId': viewer.uid,
         });
       }
@@ -865,6 +1165,54 @@ class CommunityRepository {
   /// Creates a story document (base64 image via [encodeCommunityPostImagesForFirestore]).
   // --- Stories (24h expiry, rings on Community, archive on profile) ---
 
+  // This creates a story with one photo and saved text style values.
+  Future<String> createStoryWithStyle({
+    required XFile image,
+    required String textOverlay,
+    required int textColorValue,
+    required double textSize,
+    required double textPosX,
+    required double textPosY,
+  }) async {
+    final viewer = _requireUser;
+    final viewerData = await getUser(viewer.uid);
+    final storyRef = storiesCol().doc();
+
+    // This converts the selected photo to Base64 so it can be stored in Firestore.
+    final encoded = await encodeCommunityPostImagesForFirestore([image]);
+    if (encoded.isEmpty) {
+      throw StateError(
+        'Could not process the photo. Try again or pick a different image.',
+      );
+    }
+
+    final created = DateTime.now();
+    final expires = created.add(const Duration(hours: 24));
+    final nowTs = Timestamp.fromDate(created);
+    final expiresTs = Timestamp.fromDate(expires);
+
+    // This saves the story document with the photo, text, and style values.
+    await storyRef.set({
+      'userId': viewer.uid.trim(),
+      'userName': viewerData?.displayName ?? (viewer.displayName ?? 'User'),
+      'userAvatar': viewerData?.profileImageUrl ?? viewer.photoURL,
+      'imageBase64': encoded.first,
+      // This keeps the list field for older code, but we store only one photo.
+      'imageBase64List': [encoded.first],
+      'textOverlay': textOverlay,
+      'textColorValue': textColorValue,
+      'textSize': textSize,
+      'textPosX': textPosX,
+      'textPosY': textPosY,
+      'createdAt': nowTs,
+      'expiresAt': expiresTs,
+      'likedBy': <String>[],
+      'archived': true,
+    });
+
+    return storyRef.id;
+  }
+
   Future<String> createStory({
     required XFile image,
     required String textOverlay,
@@ -890,7 +1238,14 @@ class CommunityRepository {
       'userName': viewerData?.displayName ?? (viewer.displayName ?? 'User'),
       'userAvatar': viewerData?.profileImageUrl ?? viewer.photoURL,
       'imageBase64': encoded.first,
+      // This stores the story photos as a list, so the owner can edit them later.
+      'imageBase64List': [encoded.first],
       'textOverlay': textOverlay,
+      // This stores default story text style values if the UI did not customize them.
+      'textColorValue': 0xFFFFFFFF,
+      'textSize': 20.0,
+      'textPosX': 0.5,
+      'textPosY': 0.75,
       'createdAt': nowTs,
       'expiresAt': expiresTs,
       'likedBy': <String>[],
@@ -912,6 +1267,15 @@ class CommunityRepository {
       if (!d.exists) return null;
       return CommunityStory.fromDoc(d);
     });
+  }
+
+  // This reads one story document once, so we can open a story from a notification.
+  Future<CommunityStory?> getStoryById(String storyId) async {
+    final id = storyId.trim();
+    if (id.isEmpty) return null;
+    final snap = await storiesCol().doc(id).get();
+    if (!snap.exists) return null;
+    return CommunityStory.fromDoc(snap);
   }
 
   /// All stories authored by [uid] (including expired), newest first.
@@ -1085,6 +1449,83 @@ class CommunityRepository {
           });
         }
       }
+    });
+  }
+
+  Future<void> updateStoryTextOverlay({
+    required String storyId,
+    required String textOverlay,
+  }) async {
+    final viewer = _requireUser;
+    final storyRef = storiesCol().doc(storyId);
+    final now = Timestamp.now();
+    final trimmed = textOverlay.trim();
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(storyRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final ownerId = (data['userId'] as String?)?.trim() ?? '';
+      if (ownerId.isEmpty || ownerId != viewer.uid) return;
+      tx.update(storyRef, {
+        'textOverlay': trimmed,
+        'updatedAt': now,
+      });
+    });
+  }
+
+  // This updates the full story content after the owner edits it (photos + text + style).
+  Future<void> updateStoryFull({
+    required String storyId,
+    required String textOverlay,
+    required String imageBase64,
+    required int textColorValue,
+    required double textSize,
+    required double textPosX,
+    required double textPosY,
+  }) async {
+    final viewer = _requireUser;
+    final storyRef = storiesCol().doc(storyId.trim());
+    final now = Timestamp.now();
+
+    // This cleans the Base64 string so Firestore does not store extra spaces.
+    final cleaned = imageBase64.trim();
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(storyRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+
+      // This blocks editing if the current user is not the story owner.
+      final ownerId = (data['userId'] as String?)?.trim() ?? '';
+      if (ownerId.isEmpty || ownerId != viewer.uid) return;
+
+      // This saves the edited photos and text style values into the story doc.
+      tx.update(storyRef, {
+        'imageBase64': cleaned,
+        // This keeps the list field for older code, but we store only one photo.
+        'imageBase64List': cleaned.isEmpty ? <String>[] : [cleaned],
+        'textOverlay': textOverlay,
+        'textColorValue': textColorValue,
+        'textSize': textSize,
+        'textPosX': textPosX,
+        'textPosY': textPosY,
+        'updatedAt': now,
+      });
+    });
+  }
+
+  Future<void> deleteStory({required String storyId}) async {
+    final viewer = _requireUser;
+    final storyRef = storiesCol().doc(storyId);
+
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(storyRef);
+      if (!snap.exists) return;
+      final data = snap.data() ?? const <String, dynamic>{};
+      final ownerId = (data['userId'] as String?)?.trim() ?? '';
+      if (ownerId.isEmpty || ownerId != viewer.uid) return;
+      tx.delete(storyRef);
     });
   }
 }

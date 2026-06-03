@@ -20,6 +20,7 @@ class RecipeDetailsScreen extends StatefulWidget {
   final RecipeMatch recipe;
 
   @override
+  // this creates the state object for the recipe details screen
   State<RecipeDetailsScreen> createState() => _RecipeDetailsScreenState();
 }
 
@@ -41,10 +42,14 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
   bool _showFullDescription = false;
   bool _ingredientsExpanded = true;
   bool _directionExpanded = true;
-  final Map<String, double> _ingredientMultipliers = <String, double>{};
+
+  // this is one shared ratio for all ingredients so they always keep original proportions
+  // example if this becomes 1.25 then 200 becomes 250 and 1 becomes 1.25
+  double _ingredientScale = 1;
   final Set<String> _selectedMissingIngredientKeys = <String>{};
 
   @override
+  // this runs once to initialize recipe data and start loading full details
   void initState() {
     super.initState();
     _recipe = widget.recipe;
@@ -52,6 +57,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     _loadDetails();
   }
 
+  // this fetches full recipe information from spoonacular and updates local recipe data
   Future<void> _loadDetails() async {
     // upgrades basic recipe payload with full api details when available
     if (_spoonacularKey.isEmpty || _recipe.id == 0) return;
@@ -80,6 +86,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     }
   }
 
+  // this toggles recipe favorite state for the signed-in user
   Future<void> _toggleFavoriteRecipe({
     required String userId,
     required bool isFavorite,
@@ -116,6 +123,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     }
   }
 
+  // this saves the current recipe to user history with optional feedback message
   Future<void> _saveRecipeToHistory(
     String userId, {
     bool showFeedback = true,
@@ -150,6 +158,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     }
   }
 
+  // this opens start cooking screen after saving recipe history when possible
   Future<void> _openStartCookingFlow() async {
     // ensures history save attempt then opens start cooking flow screen
     if (_isSavingToHistory) return;
@@ -169,6 +178,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     );
   }
 
+  // this normalizes ingredient text so matching and deduplication are consistent
   String _normalizeIngredientText(String value) {
     return value
         .toLowerCase()
@@ -177,6 +187,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
         .trim();
   }
 
+  // this returns unique missing ingredient names from recipe data
   List<String> _missingIngredientNames() {
     final seen = <String>{};
     final values = <String>[];
@@ -191,6 +202,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     return values;
   }
 
+  // this maps missing ingredient keys to their detailed ingredient objects when available
   Map<String, RecipeIngredient> _missingIngredientDetailsByKey() {
     // maps missing ingredient names to rich ingredient detail objects for quantity/cart use
     final byKey = <String, RecipeIngredient>{};
@@ -216,6 +228,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     return byKey;
   }
 
+  // this keeps selected missing ingredients synced with current missing list
   void _syncMissingSelectionState(List<String> missingNames) {
     final missingKeys = missingNames
         .map(_normalizeIngredientText)
@@ -228,6 +241,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     }
   }
 
+  // this toggles one missing ingredient selected state for add to cart
   void _toggleMissingIngredientSelection(String key) {
     setState(() {
       if (_selectedMissingIngredientKeys.contains(key)) {
@@ -257,6 +271,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     return partial;
   }
 
+  // this tries to add selected missing ingredients to user cart storage
   Future<void> _addMissingIngredientsToCart(String userId) async {
     // matches missing ingredients with shop ingredients then writes selected ones to cart
     final missing = _missingIngredientNames();
@@ -291,7 +306,10 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
         final detail = detailByKey[missingKey];
         final scaledAmount = detail?.amount == null
             ? 1.0
-            : (detail!.amount! * _servingScaleFactor()).clamp(0.1, 100.0);
+            : (detail!.amount! * _servingScaleFactor() * _ingredientScale).clamp(
+                0.1,
+                100.0,
+              );
         await _ingredientService.saveUserShopCartItem(
           userId: userId,
           ingredient: match,
@@ -415,6 +433,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
   }
 
   @override
+  // this builds the full recipe details page ui
   Widget build(BuildContext context) {
     // combines favorite stream + recipe state to render details and actions in sync
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
@@ -839,6 +858,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     );
   }
 
+  // this builds a combined ingredient list when detailed amounts are missing
   List<String> _ingredientList() {
     final items = <String>{
       ..._recipe.usedIngredients,
@@ -848,10 +868,11 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     return items.toList();
   }
 
+  // this builds formatted ingredient display lines with scaled amounts
   List<String> _ingredientDisplayLines() {
     if (_recipe.ingredientDetails.isNotEmpty) {
       final lines = <String>[];
-      final scale = _servingScaleFactor();
+      final scale = _servingScaleFactor() * _ingredientScale;
       for (final ingredient in _recipe.ingredientDetails) {
         final amountValue = ingredient.amount;
         final amountText = amountValue == null
@@ -866,38 +887,34 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     return _ingredientList();
   }
 
-  String _ingredientKey(RecipeIngredient ingredient) {
-    return ingredient.name.trim().toLowerCase();
+  // this increases one shared scale so all ingredients keep original ratios
+  void _increaseIngredientAmount() {
+    // each tap adds 0.25 to the shared ratio
+    // so the amount formula uses x1.25 x1.5 x1.75 and so on
+    setState(() => _ingredientScale += 0.25);
   }
 
-  double _ingredientMultiplier(RecipeIngredient ingredient) {
-    return _ingredientMultipliers[_ingredientKey(ingredient)] ?? 1;
-  }
-
-  void _increaseIngredientAmount(RecipeIngredient ingredient) {
-    final key = _ingredientKey(ingredient);
-    final current = _ingredientMultipliers[key] ?? 1;
-    setState(() => _ingredientMultipliers[key] = current + 0.25);
-  }
-
-  void _decreaseIngredientAmount(RecipeIngredient ingredient) {
-    final key = _ingredientKey(ingredient);
-    final current = _ingredientMultipliers[key] ?? 1;
-    final next = current - 0.25;
+  // this decreases one shared scale so all ingredients keep original ratios
+  void _decreaseIngredientAmount() {
+    // each tap removes 0.25 from the shared ratio
+    final next = _ingredientScale - 0.25;
+    // this keeps a safe minimum so values never go to zero or negative
     if (next <= 0.25) {
-      setState(() => _ingredientMultipliers[key] = 0.25);
+      setState(() => _ingredientScale = 0.25);
       return;
     }
-    setState(() => _ingredientMultipliers[key] = next);
+    setState(() => _ingredientScale = next);
   }
 
+  // this resets ingredient scale and servings back to defaults
   void _resetIngredientQuantitiesToDefault() {
     setState(() {
-      _ingredientMultipliers.clear();
+      _ingredientScale = 1;
       _servings = _recipe.servings > 0 ? _recipe.servings : 2;
     });
   }
 
+  // this builds the main ingredients panel content with amount controls
   Widget _buildIngredientsContent() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final panelColor = isDarkMode
@@ -918,7 +935,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
         .toSet();
 
     if (_recipe.ingredientDetails.isNotEmpty) {
-      final scale = _servingScaleFactor();
+      final scale = _servingScaleFactor() * _ingredientScale;
       final nonMissingDetails = _recipe.ingredientDetails.where((ingredient) {
         final key = _normalizeIngredientText(ingredient.name);
         if (key.isEmpty) return false;
@@ -944,10 +961,9 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
       return Column(
         children: nonMissingDetails.map((ingredient) {
           final amount = ingredient.amount;
-          final multiplier = _ingredientMultiplier(ingredient);
           final effectiveAmount = amount == null
               ? null
-              : (amount * scale * multiplier);
+              : (amount * scale);
           final amountText = effectiveAmount == null
               ? '—'
               : _formatAmount(effectiveAmount);
@@ -995,12 +1011,12 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
                     children: [
                       _SmallRoundAction(
                         icon: Icons.remove,
-                        onTap: () => _decreaseIngredientAmount(ingredient),
+                        onTap: _decreaseIngredientAmount,
                       ),
                       const SizedBox(width: 8),
                       _SmallRoundAction(
                         icon: Icons.add,
-                        onTap: () => _increaseIngredientAmount(ingredient),
+                        onTap: _increaseIngredientAmount,
                         filled: true,
                       ),
                     ],
@@ -1058,6 +1074,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     );
   }
 
+  // this builds ingredients section together with missing ingredients cart controls
   Widget _buildIngredientsAndMissingContent(String? currentUserId) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final missing = _missingIngredientNames();
@@ -1127,7 +1144,8 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
               final detail = detailByKey[key];
               final hasAmount = detail?.amount != null;
               final effectiveAmount = hasAmount
-                  ? (detail!.amount! * _servingScaleFactor()).clamp(0.1, 100.0)
+                  ? (detail!.amount! * _servingScaleFactor() * _ingredientScale)
+                        .clamp(0.1, 100.0)
                   : null;
               final amountText = effectiveAmount == null
                   ? 'Quantity unavailable'
@@ -1254,13 +1272,20 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     );
   }
 
+  // this returns servings scale ratio compared to the recipe base servings
   double _servingScaleFactor() {
+    // this is servings ratio only
+    // example recipe base 4 servings and user chooses 6 then this returns 1.5
     final baseServings = _recipe.servings > 0 ? _recipe.servings : _servings;
     if (baseServings <= 0) return 1;
     return _servings / baseServings;
   }
 
+  // this formats amounts for display as integer or one decimal when needed
   String _formatAmount(double value) {
+    // this formatting is why decimals may look different between ingredients
+    // example 200 * 1.25 = 250 so it shows as 250
+    // example 1 * 1.25 = 1.25 then rounded to one decimal so it shows as 1.3
     final roundedInt = value.roundToDouble();
     if ((value - roundedInt).abs() < 0.01) return roundedInt.toInt().toString();
 
@@ -1286,6 +1311,7 @@ class _CircleIconButton extends StatelessWidget {
   final Color iconColor;
 
   @override
+  // this builds a circular tap button used in the top app bar row
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
@@ -1306,6 +1332,7 @@ class _AnimatedSuccessCheckmark extends StatelessWidget {
   const _AnimatedSuccessCheckmark();
 
   @override
+  // this builds an animated success checkmark for cart confirmation dialog
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: 1),
@@ -1346,6 +1373,7 @@ class _SmallRoundAction extends StatelessWidget {
   final bool filled;
 
   @override
+  // this builds small plus minus round controls used in quantities and servings
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
@@ -1385,6 +1413,7 @@ class _ServingStatBox extends StatelessWidget {
   final Widget trailing;
 
   @override
+  // this builds one info box under title and trailing value widget
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Column(
@@ -1419,6 +1448,7 @@ class _DetailPanel extends StatelessWidget {
   final Widget child;
 
   @override
+  // this builds expandable section container used for ingredients and directions
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -1479,6 +1509,7 @@ class _DetailsFavoriteHeartButton extends StatefulWidget {
   final bool isFavorite;
 
   @override
+  // this creates the state object for the animated favorite heart button
   State<_DetailsFavoriteHeartButton> createState() =>
       _DetailsFavoriteHeartButtonState();
 }
@@ -1491,6 +1522,7 @@ class _DetailsFavoriteHeartButtonState
   late final Animation<double> _fillAnimation;
 
   @override
+  // this initializes favorite heart animation controllers and initial values
   void initState() {
     super.initState();
     _fillController = AnimationController(
@@ -1511,6 +1543,7 @@ class _DetailsFavoriteHeartButtonState
   }
 
   @override
+  // this updates heart animation direction when favorite state changes
   void didUpdateWidget(covariant _DetailsFavoriteHeartButton oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isFavorite == widget.isFavorite) return;
@@ -1522,6 +1555,7 @@ class _DetailsFavoriteHeartButtonState
   }
 
   @override
+  // this disposes favorite heart animation resources
   void dispose() {
     _fillController.dispose();
     _waveController.dispose();
@@ -1529,6 +1563,7 @@ class _DetailsFavoriteHeartButtonState
   }
 
   @override
+  // this builds the animated favorite heart with liquid fill effect
   Widget build(BuildContext context) {
     final borderColor = Color.lerp(
       const Color(0xFF3A2214).withValues(alpha: 0.7),
@@ -1586,6 +1621,7 @@ class _DetailsWaveFillClipper extends CustomClipper<Path> {
   final double phase;
 
   @override
+  // this creates wave clipping path based on fill level and wave phase
   Path getClip(Size size) {
     final clampedLevel = fillLevel.clamp(0.0, 1.0).toDouble();
     final waterTop = size.height * (1 - clampedLevel);
@@ -1605,6 +1641,7 @@ class _DetailsWaveFillClipper extends CustomClipper<Path> {
   }
 
   @override
+  // this decides when wave clip path should be recalculated
   bool shouldReclip(covariant _DetailsWaveFillClipper oldClipper) {
     return oldClipper.fillLevel != fillLevel || oldClipper.phase != phase;
   }
@@ -1616,6 +1653,7 @@ class _InfoText extends StatelessWidget {
   final String text;
 
   @override
+  // this builds a compact icon plus text row for recipe quick stats
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Row(
@@ -1645,6 +1683,7 @@ class _StatBox extends StatelessWidget {
   final String value;
 
   @override
+  // this builds a simple stat box with title and value
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
@@ -1689,6 +1728,7 @@ class _ExpandableInfo extends StatelessWidget {
   final bool initiallyExpanded;
 
   @override
+  // this builds a reusable expansion tile container
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(

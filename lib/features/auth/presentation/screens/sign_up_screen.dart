@@ -91,7 +91,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                       const Spacer(),
                       Text(
-                        'SmartChef',
+                        'CulinaryCoach',
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: Colors.white.withValues(alpha: 0.88),
                           fontWeight: FontWeight.w600,
@@ -113,7 +113,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Start your SmartChef journey with AI ingredient scanning, guided cooking mode, and a social food community.',
+                    'Start your CulinaryCoach journey with AI ingredient scanning, guided cooking mode, and a social food community.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: Colors.white.withValues(alpha: 0.62),
                       height: 1.5,
