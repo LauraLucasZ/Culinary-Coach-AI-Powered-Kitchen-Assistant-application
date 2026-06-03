@@ -41,7 +41,10 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
   bool _showFullDescription = false;
   bool _ingredientsExpanded = true;
   bool _directionExpanded = true;
-  final Map<String, double> _ingredientMultipliers = <String, double>{};
+
+  // this is one shared ratio for all ingredients so they always keep original proportions
+  // example if this becomes 1.25 then 200 becomes 250 and 1 becomes 1.25
+  double _ingredientScale = 1;
   final Set<String> _selectedMissingIngredientKeys = <String>{};
 
   @override
@@ -291,7 +294,10 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
         final detail = detailByKey[missingKey];
         final scaledAmount = detail?.amount == null
             ? 1.0
-            : (detail!.amount! * _servingScaleFactor()).clamp(0.1, 100.0);
+            : (detail!.amount! * _servingScaleFactor() * _ingredientScale).clamp(
+                0.1,
+                100.0,
+              );
         await _ingredientService.saveUserShopCartItem(
           userId: userId,
           ingredient: match,
@@ -851,7 +857,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
   List<String> _ingredientDisplayLines() {
     if (_recipe.ingredientDetails.isNotEmpty) {
       final lines = <String>[];
-      final scale = _servingScaleFactor();
+      final scale = _servingScaleFactor() * _ingredientScale;
       for (final ingredient in _recipe.ingredientDetails) {
         final amountValue = ingredient.amount;
         final amountText = amountValue == null
@@ -866,34 +872,28 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     return _ingredientList();
   }
 
-  String _ingredientKey(RecipeIngredient ingredient) {
-    return ingredient.name.trim().toLowerCase();
+  // this increases one shared scale so all ingredients keep original ratios
+  void _increaseIngredientAmount() {
+    // each tap adds 0.25 to the shared ratio
+    // so the amount formula uses x1.25 x1.5 x1.75 and so on
+    setState(() => _ingredientScale += 0.25);
   }
 
-  double _ingredientMultiplier(RecipeIngredient ingredient) {
-    return _ingredientMultipliers[_ingredientKey(ingredient)] ?? 1;
-  }
-
-  void _increaseIngredientAmount(RecipeIngredient ingredient) {
-    final key = _ingredientKey(ingredient);
-    final current = _ingredientMultipliers[key] ?? 1;
-    setState(() => _ingredientMultipliers[key] = current + 0.25);
-  }
-
-  void _decreaseIngredientAmount(RecipeIngredient ingredient) {
-    final key = _ingredientKey(ingredient);
-    final current = _ingredientMultipliers[key] ?? 1;
-    final next = current - 0.25;
+  // this decreases one shared scale so all ingredients keep original ratios
+  void _decreaseIngredientAmount() {
+    // each tap removes 0.25 from the shared ratio
+    final next = _ingredientScale - 0.25;
+    // this keeps a safe minimum so values never go to zero or negative
     if (next <= 0.25) {
-      setState(() => _ingredientMultipliers[key] = 0.25);
+      setState(() => _ingredientScale = 0.25);
       return;
     }
-    setState(() => _ingredientMultipliers[key] = next);
+    setState(() => _ingredientScale = next);
   }
 
   void _resetIngredientQuantitiesToDefault() {
     setState(() {
-      _ingredientMultipliers.clear();
+      _ingredientScale = 1;
       _servings = _recipe.servings > 0 ? _recipe.servings : 2;
     });
   }
@@ -918,7 +918,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
         .toSet();
 
     if (_recipe.ingredientDetails.isNotEmpty) {
-      final scale = _servingScaleFactor();
+      final scale = _servingScaleFactor() * _ingredientScale;
       final nonMissingDetails = _recipe.ingredientDetails.where((ingredient) {
         final key = _normalizeIngredientText(ingredient.name);
         if (key.isEmpty) return false;
@@ -944,10 +944,9 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
       return Column(
         children: nonMissingDetails.map((ingredient) {
           final amount = ingredient.amount;
-          final multiplier = _ingredientMultiplier(ingredient);
           final effectiveAmount = amount == null
               ? null
-              : (amount * scale * multiplier);
+              : (amount * scale);
           final amountText = effectiveAmount == null
               ? '—'
               : _formatAmount(effectiveAmount);
@@ -995,12 +994,12 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
                     children: [
                       _SmallRoundAction(
                         icon: Icons.remove,
-                        onTap: () => _decreaseIngredientAmount(ingredient),
+                        onTap: _decreaseIngredientAmount,
                       ),
                       const SizedBox(width: 8),
                       _SmallRoundAction(
                         icon: Icons.add,
-                        onTap: () => _increaseIngredientAmount(ingredient),
+                        onTap: _increaseIngredientAmount,
                         filled: true,
                       ),
                     ],
@@ -1127,7 +1126,8 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
               final detail = detailByKey[key];
               final hasAmount = detail?.amount != null;
               final effectiveAmount = hasAmount
-                  ? (detail!.amount! * _servingScaleFactor()).clamp(0.1, 100.0)
+                  ? (detail!.amount! * _servingScaleFactor() * _ingredientScale)
+                        .clamp(0.1, 100.0)
                   : null;
               final amountText = effectiveAmount == null
                   ? 'Quantity unavailable'
@@ -1255,12 +1255,17 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
   }
 
   double _servingScaleFactor() {
+    // this is servings ratio only
+    // example recipe base 4 servings and user chooses 6 then this returns 1.5
     final baseServings = _recipe.servings > 0 ? _recipe.servings : _servings;
     if (baseServings <= 0) return 1;
     return _servings / baseServings;
   }
 
   String _formatAmount(double value) {
+    // this formatting is why decimals may look different between ingredients
+    // example 200 * 1.25 = 250 so it shows as 250
+    // example 1 * 1.25 = 1.25 then rounded to one decimal so it shows as 1.3
     final roundedInt = value.roundToDouble();
     if ((value - roundedInt).abs() < 0.01) return roundedInt.toInt().toString();
 
