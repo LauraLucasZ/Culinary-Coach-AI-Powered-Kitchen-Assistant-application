@@ -28,7 +28,7 @@ class CulinaryCoachApp extends ConsumerWidget {
     );
   }
 }
-
+// Auth gate decides whether user sees onboarding or main app
 class _AuthSessionGate extends StatelessWidget {
   const _AuthSessionGate();
 
