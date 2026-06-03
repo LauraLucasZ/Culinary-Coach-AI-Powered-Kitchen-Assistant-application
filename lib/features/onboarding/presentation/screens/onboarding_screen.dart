@@ -195,7 +195,7 @@ class _SplashSlide extends StatelessWidget {
               children: [
                 Image.asset(AppAssets.smartChefLogo, height: 200, width: 200),
                 Text(
-                  'SmartChef',
+                  'CulinaryCoach',
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFF3A2214),
@@ -281,7 +281,7 @@ class _StorySlide extends StatelessWidget {
                     left: 0,
                     right: 0,
                     child: Text(
-                      'SmartChef',
+                      'CulinaryCoach',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: Colors.white.withValues(alpha: 0.88),
@@ -425,7 +425,7 @@ class _SignUpSlide extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  'SmartChef',
+                  'CulinaryCoach',
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: Colors.white.withValues(alpha: 0.88),
                     fontWeight: FontWeight.w600,

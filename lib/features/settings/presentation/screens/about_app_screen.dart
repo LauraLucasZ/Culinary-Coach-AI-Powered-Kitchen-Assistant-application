@@ -38,7 +38,7 @@ class AboutAppScreen extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
         children: [
           Text(
-            'SmartChef',
+            'CulinaryCoach',
             style: TextStyle(
               color: textColor,
               fontWeight: FontWeight.w900,

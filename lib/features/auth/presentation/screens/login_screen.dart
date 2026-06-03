@@ -118,7 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const Spacer(),
                               Text(
-                                'SmartChef',
+                                'CulinaryCoach',
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   color: Colors.white.withValues(alpha: 0.88),
                                   fontWeight: FontWeight.w600,

@@ -49,7 +49,7 @@ class PrivacyPolicyScreen extends ConsumerWidget {
           _PolicySection(
             title: 'Information we collect',
             body:
-                'We may collect account details, pantry selections, recipe history, and app usage actions to provide the SmartChef experience.',
+                'We may collect account details, pantry selections, recipe history, and app usage actions to provide the CulinaryCoach experience.',
             textColor: textColor,
             subtitleColor: subtitleColor,
           ),

@@ -13,7 +13,7 @@ Future<void> main() async {
   await _initializeFirebase();
   // ProviderScope turns on riverpod for the full app
   // if we remove it, providers will not work anywhere
-  runApp(const ProviderScope(child: SmartChefApp()));
+  runApp(const ProviderScope(child: CulinaryCoachApp()));
 }
 
 Future<void> _initializeFirebase() async {
