@@ -206,7 +206,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final pageBg =
+        isDarkMode ? const Color(0xFF121212) : AppColors.background;
     return Scaffold(
+      backgroundColor: pageBg,
       appBar: AppBar(
         title: const Text('Edit Profile'),
       ),
@@ -431,15 +435,24 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final cardColor =
+        isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final titleColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+    final shadow =
+        Colors.black.withValues(alpha: isDarkMode ? 0.24 : 0.07);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: AppColors.textPrimary.withValues(alpha: 0.07),
+            color: shadow,
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -452,7 +465,7 @@ class _SectionCard extends StatelessWidget {
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: titleColor,
                 ),
           ),
           const SizedBox(height: 12),
@@ -480,12 +493,21 @@ class _DropdownRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final rowBg =
+        isDarkMode ? const Color(0xFF1E1E1E) : AppColors.surfaceMuted;
+    final labelColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+    final valueColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
+        color: rowBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
@@ -496,7 +518,7 @@ class _DropdownRow extends StatelessWidget {
               label,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: labelColor,
                   ),
             ),
           ),
@@ -505,11 +527,11 @@ class _DropdownRow extends StatelessWidget {
             child: DropdownButton<String>(
               value: value,
               borderRadius: BorderRadius.circular(14),
-              dropdownColor: Colors.white,
+              dropdownColor: isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
               icon: const Icon(Icons.keyboard_arrow_down_rounded),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: valueColor,
                   ),
               items: items
                   .map(
@@ -546,12 +568,23 @@ class _TextRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final rowBg =
+        isDarkMode ? const Color(0xFF1E1E1E) : AppColors.surfaceMuted;
+    final labelColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+    final valueColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+    final hintColor =
+        isDarkMode ? const Color(0xFF9A9A9A) : AppColors.textMuted;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
+        color: rowBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
@@ -563,7 +596,7 @@ class _TextRow extends StatelessWidget {
               label,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: labelColor,
                   ),
             ),
           ),
@@ -576,6 +609,10 @@ class _TextRow extends StatelessWidget {
               cursorColor: AppColors.primaryDeep,
               decoration: InputDecoration(
                 hintText: hintText,
+                hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: hintColor,
+                      fontWeight: FontWeight.w600,
+                    ),
                 isDense: true,
                 filled: false,
                 border: InputBorder.none,
@@ -585,7 +622,7 @@ class _TextRow extends StatelessWidget {
               ),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: valueColor,
                   ),
             ),
           ),
@@ -604,12 +641,22 @@ class _ReadOnlyRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final rowBg =
+        isDarkMode ? const Color(0xFF1E1E1E) : AppColors.surfaceMuted;
+    final labelColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+    final valueColor = isDarkMode
+        ? const Color(0xFFF2F2F2).withValues(alpha: 0.85)
+        : AppColors.textPrimary.withValues(alpha: 0.85);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
+        color: rowBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
@@ -620,7 +667,7 @@ class _ReadOnlyRow extends StatelessWidget {
               label,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: labelColor,
                   ),
             ),
           ),
@@ -632,7 +679,7 @@ class _ReadOnlyRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary.withValues(alpha: 0.85),
+                    color: valueColor,
                   ),
             ),
           ),
@@ -649,13 +696,16 @@ class _RowIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
     return Container(
       height: 34,
       width: 34,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: AppColors.primary.withValues(alpha: 0.12),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: borderColor),
       ),
       child: Icon(icon, color: AppColors.primaryDeep, size: 18),
     );

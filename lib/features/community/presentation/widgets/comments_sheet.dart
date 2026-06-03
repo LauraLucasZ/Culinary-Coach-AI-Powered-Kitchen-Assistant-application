@@ -92,6 +92,19 @@ class _CommentsSheetState extends State<CommentsSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final repo = CommunityRepository();
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg =
+        isDarkMode ? const Color(0xFF121212) : AppColors.background;
+    final cardColor =
+        isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final titleColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+    final secondaryColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+    final mutedColor =
+        isDarkMode ? const Color(0xFF9A9A9A) : AppColors.textMuted;
 
     // Column widget tree: handle, title row, Flexible comment ListView, input row at bottom.
     return Padding(
@@ -99,7 +112,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
         child: Container(
-          color: AppColors.background,
+          color: sheetBg,
           child: SafeArea(
             top: false,
             child: Column(
@@ -110,7 +123,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                   height: 5,
                   margin: const EdgeInsets.only(top: 10, bottom: 10),
                   decoration: BoxDecoration(
-                    color: AppColors.outline,
+                    color: borderColor,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -122,13 +135,13 @@ class _CommentsSheetState extends State<CommentsSheet> {
                         'Comments',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
+                              color: titleColor,
                             ),
                       ),
                       const Spacer(),
                       IconButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded),
+                        icon: Icon(Icons.close_rounded, color: mutedColor),
                       ),
                     ],
                   ),
@@ -144,13 +157,13 @@ class _CommentsSheetState extends State<CommentsSheet> {
                         return const Center(child: CircularProgressIndicator());
                       }
                       if (comments.isEmpty) {
-                        return const Padding(
-                          padding: EdgeInsets.fromLTRB(18, 20, 18, 20),
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
                           child: Text(
                             'Be the first to comment.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: AppColors.textSecondary,
+                              color: secondaryColor,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -186,7 +199,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.outline),
+                          border: Border.all(color: borderColor),
                         ),
                         child: Row(
                           children: [
@@ -199,7 +212,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                                 overflow: TextOverflow.ellipsis,
                                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                                       fontWeight: FontWeight.w800,
-                                      color: AppColors.textSecondary,
+                                      color: secondaryColor,
                                     ),
                               ),
                             ),
@@ -216,12 +229,12 @@ class _CommentsSheetState extends State<CommentsSheet> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardColor,
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: AppColors.outline),
+                        border: Border.all(color: borderColor),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.textPrimary.withValues(alpha: 0.06),
+                            color: Colors.black.withValues(alpha: isDarkMode ? 0.22 : 0.06),
                             blurRadius: 16,
                             offset: const Offset(0, 8),
                           ),
@@ -234,7 +247,9 @@ class _CommentsSheetState extends State<CommentsSheet> {
                             padding: const EdgeInsets.only(bottom: 4, left: 4),
                             child: CurrentUserAvatar(
                               size: 32,
-                              backgroundColor: const Color(0xFFD28E18),
+                              backgroundColor: isDarkMode
+                                  ? const Color(0xFF444444)
+                                  : const Color(0xFFD28E18),
                               borderColor:
                                   Colors.white.withValues(alpha: 0.65),
                               borderWidth: 2,
@@ -252,7 +267,16 @@ class _CommentsSheetState extends State<CommentsSheet> {
                                     ? 'Write a reply...'
                                     : 'Write a comment...',
                                 border: InputBorder.none,
+                                hintStyle:
+                                    Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          color: mutedColor,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                               ),
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: titleColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
                           ),
                           const SizedBox(width: 2),
@@ -275,7 +299,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
                                     height: 18,
                                     child: CircularProgressIndicator(strokeWidth: 2),
                                   )
-                                : const Icon(Icons.send_rounded),
+                                : Icon(Icons.send_rounded, color: AppColors.primaryDeep),
                           ),
                         ],
                       ),
@@ -311,13 +335,114 @@ class _CommentBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = comment;
     final liked = c.isLikedBy(currentUid);
+    final isOwner = (currentUid ?? '').trim().isNotEmpty &&
+        (currentUid ?? '').trim() == c.uid.trim();
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final cardColor =
+        isDarkMode ? const Color(0xFF2C2C2C) : Colors.white;
+    final borderColor =
+        isDarkMode ? const Color(0xFF444444) : AppColors.outline;
+    final titleColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+    final secondaryColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+    final mutedColor =
+        isDarkMode ? const Color(0xFF9A9A9A) : AppColors.textMuted;
+
+    Future<void> editComment() async {
+      final controller = TextEditingController(text: c.text);
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+          final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+          final secondary = isDark ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+          return AlertDialog(
+            backgroundColor: bg,
+            surfaceTintColor: Colors.transparent,
+            title: Text(
+              'Edit comment',
+              style: TextStyle(color: title, fontWeight: FontWeight.w800),
+            ),
+            content: TextField(
+              controller: controller,
+              minLines: 1,
+              maxLines: 5,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Edit your comment...',
+                hintStyle: TextStyle(color: secondary, fontWeight: FontWeight.w600),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      );
+      if (ok != true) return;
+      try {
+        await repo.updateCommentText(
+          postId: postId,
+          commentId: c.id,
+          text: controller.text,
+        );
+      } catch (_) {}
+    }
+
+    Future<void> deleteComment() async {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+          final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+          final secondary = isDark ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+          return AlertDialog(
+            backgroundColor: bg,
+            surfaceTintColor: Colors.transparent,
+            title: Text(
+              'Delete comment?',
+              style: TextStyle(color: title, fontWeight: FontWeight.w800),
+            ),
+            content: Text(
+              'This will delete your comment and its replies.',
+              style: TextStyle(color: secondary, fontWeight: FontWeight.w600),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: TextButton.styleFrom(foregroundColor: const Color(0xFFB3261E)),
+                child: const Text('Delete'),
+              ),
+            ],
+          );
+        },
+      );
+      if (ok != true) return;
+      try {
+        await repo.deleteComment(postId: postId, commentId: c.id);
+      } catch (_) {}
+    }
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -344,7 +469,7 @@ class _CommentBlock extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.labelLarge?.copyWith(
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.textPrimary,
+                                  color: titleColor,
                                 ),
                           ),
                         ),
@@ -352,17 +477,48 @@ class _CommentBlock extends StatelessWidget {
                         Text(
                           _timeAgo(c.createdAt),
                           style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                color: AppColors.textMuted,
+                                color: mutedColor,
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
+                        if (isOwner) ...[
+                          const SizedBox(width: 4),
+                          PopupMenuButton<String>(
+                            tooltip: 'Comment options',
+                            icon: Icon(Icons.more_horiz_rounded, color: mutedColor),
+                            color: isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+                            surfaceTintColor: Colors.transparent,
+                            onSelected: (v) {
+                              if (v == 'edit') {
+                                () async {
+                                  await editComment();
+                                }();
+                              }
+                              if (v == 'delete') {
+                                () async {
+                                  await deleteComment();
+                                }();
+                              }
+                            },
+                            itemBuilder: (context) => const [
+                              PopupMenuItem<String>(
+                                value: 'edit',
+                                child: Text('Edit'),
+                              ),
+                              PopupMenuItem<String>(
+                                value: 'delete',
+                                child: Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
                       c.text,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textSecondary,
+                            color: secondaryColor,
                             fontWeight: FontWeight.w600,
                             height: 1.3,
                           ),
@@ -395,7 +551,7 @@ class _CommentBlock extends StatelessWidget {
                                     '${c.likesCount}',
                                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                                           fontWeight: FontWeight.w800,
-                                          color: AppColors.textSecondary,
+                                          color: secondaryColor,
                                         ),
                                   ),
                                 ],
@@ -438,7 +594,7 @@ class _CommentBlock extends StatelessWidget {
           ),
           if (c.replies.isNotEmpty) ...[
             const SizedBox(height: 10),
-            const Divider(height: 1),
+            Divider(height: 1, color: borderColor),
             const SizedBox(height: 8),
             ...c.replies.map(
               (r) => _ReplyRow(
@@ -475,6 +631,108 @@ class _ReplyRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = reply;
     final liked = r.isLikedBy(currentUid);
+    final isOwner = (currentUid ?? '').trim().isNotEmpty &&
+        (currentUid ?? '').trim() == r.userId.trim();
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final titleColor =
+        isDarkMode ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+    final secondaryColor =
+        isDarkMode ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+    final mutedColor =
+        isDarkMode ? const Color(0xFF9A9A9A) : AppColors.textMuted;
+
+    Future<void> editReply() async {
+      final controller = TextEditingController(text: r.text);
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+          final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+          final secondary = isDark ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+          return AlertDialog(
+            backgroundColor: bg,
+            surfaceTintColor: Colors.transparent,
+            title: Text(
+              'Edit reply',
+              style: TextStyle(color: title, fontWeight: FontWeight.w800),
+            ),
+            content: TextField(
+              controller: controller,
+              minLines: 1,
+              maxLines: 5,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'Edit your reply...',
+                hintStyle: TextStyle(color: secondary, fontWeight: FontWeight.w600),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      );
+      if (ok != true) return;
+      try {
+        await repo.updateReplyText(
+          postId: postId,
+          commentId: commentId,
+          replyId: r.id,
+          text: controller.text,
+        );
+      } catch (_) {}
+    }
+
+    Future<void> deleteReply() async {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final bg = isDark ? const Color(0xFF2C2C2C) : Colors.white;
+          final title = isDark ? const Color(0xFFF2F2F2) : AppColors.textPrimary;
+          final secondary = isDark ? const Color(0xFFBFBFBF) : AppColors.textSecondary;
+          return AlertDialog(
+            backgroundColor: bg,
+            surfaceTintColor: Colors.transparent,
+            title: Text(
+              'Delete reply?',
+              style: TextStyle(color: title, fontWeight: FontWeight.w800),
+            ),
+            content: Text(
+              'This will delete your reply.',
+              style: TextStyle(color: secondary, fontWeight: FontWeight.w600),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                style: TextButton.styleFrom(foregroundColor: const Color(0xFFB3261E)),
+                child: const Text('Delete'),
+              ),
+            ],
+          );
+        },
+      );
+      if (ok != true) return;
+      try {
+        await repo.deleteReply(
+          postId: postId,
+          commentId: commentId,
+          replyId: r.id,
+        );
+      } catch (_) {}
+    }
 
     return Padding(
       padding: const EdgeInsets.only(left: 8, top: 6, bottom: 6),
@@ -500,24 +758,55 @@ class _ReplyRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelMedium?.copyWith(
                               fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
+                              color: titleColor,
                             ),
                       ),
                     ),
                     Text(
                       _timeAgo(r.createdAt),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppColors.textMuted,
+                            color: mutedColor,
                             fontWeight: FontWeight.w600,
                           ),
                     ),
+                    if (isOwner) ...[
+                      const SizedBox(width: 4),
+                      PopupMenuButton<String>(
+                        tooltip: 'Reply options',
+                        icon: Icon(Icons.more_horiz_rounded, color: mutedColor, size: 18),
+                        color: isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+                        surfaceTintColor: Colors.transparent,
+                        onSelected: (v) {
+                          if (v == 'edit') {
+                            () async {
+                              await editReply();
+                            }();
+                          }
+                          if (v == 'delete') {
+                            () async {
+                              await deleteReply();
+                            }();
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem<String>(
+                            value: 'edit',
+                            child: Text('Edit'),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'delete',
+                            child: Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 2),
                 Text(
                   r.text,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
+                        color: secondaryColor,
                         fontWeight: FontWeight.w600,
                         height: 1.3,
                       ),
@@ -547,7 +836,7 @@ class _ReplyRow extends StatelessWidget {
                             '${r.likesCount}',
                             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.textSecondary,
+                                  color: secondaryColor,
                                 ),
                           ),
                         ],

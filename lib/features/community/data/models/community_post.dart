@@ -57,6 +57,10 @@ class CommunityPost {
 
   bool get isRepost => repostOfPostId != null && repostOfPostId!.isNotEmpty;
 
+  /// Firestore id of the post whose caption/media we display (original for reposts).
+  String get contentSourcePostId =>
+      isRepost ? (repostOfPostId ?? id) : id;
+
   bool get hasPostImages =>
       imageUrls.isNotEmpty || imageBase64List.isNotEmpty;
 
