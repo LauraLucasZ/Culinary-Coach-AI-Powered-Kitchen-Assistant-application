@@ -1,4 +1,5 @@
 // lib/features/my_recipes/presentation/screens/my_recipes_screen.dart
+// My Recipes Screen - Displays user's cooking history and favorite recipes with tab navigation
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/app/theme/app_colors.dart';
@@ -12,8 +13,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
-// Extension to add Firestore methods to RecipeMatch
+// ==================== BACKEND: Firestore Data Models ====================
+
+// Extension to add Firestore conversion methods to RecipeMatch
+// Converts RecipeMatch objects to Firestore-compatible maps for storage
 extension RecipeMatchFirestore on RecipeMatch {
+  // Converts recipe to Firestore document format for started_recipes collection
+  // Stores recipe data when user starts cooking a recipe
   Map<String, dynamic> toFirestoreStarted() {
     return {
       'calories': calories,
@@ -27,7 +33,7 @@ extension RecipeMatchFirestore on RecipeMatch {
       'readyInMinutes': readyInMinutes,
       'recipeId': id,
       'servings': servings,
-      'startedAt': FieldValue.serverTimestamp(),
+      'startedAt': FieldValue.serverTimestamp(), // Auto-generated timestamp
       'summary': summary,
       'title': title,
       'unusedIngredients': unusedIngredients,
@@ -36,6 +42,8 @@ extension RecipeMatchFirestore on RecipeMatch {
     };
   }
 
+  // Converts recipe to Firestore document format for favorite_recipes collection
+  // Stores recipe data when user favorites a recipe
   Map<String, dynamic> toFirestoreFavorite() {
     return {
       'calories': calories,
@@ -46,7 +54,7 @@ extension RecipeMatchFirestore on RecipeMatch {
       'rating': rating,
       'readyInMinutes': readyInMinutes,
       'recipeId': id,
-      'savedAt': FieldValue.serverTimestamp(),
+      'savedAt': FieldValue.serverTimestamp(), // Auto-generated timestamp
       'servings': servings,
       'summary': summary,
       'title': title,
@@ -57,7 +65,8 @@ extension RecipeMatchFirestore on RecipeMatch {
   }
 }
 
-// Helper function to convert Firestore data to RecipeMatch
+// BACKEND: Helper function to convert Firestore data back to RecipeMatch model
+// Reconstructs RecipeMatch object from Firestore document data
 RecipeMatch _recipeMatchFromFirestore(Map<String, dynamic> data, String docId) {
   return RecipeMatch(
     id: data['recipeId'] as int? ?? int.tryParse(docId) ?? 0,
@@ -80,6 +89,8 @@ RecipeMatch _recipeMatchFromFirestore(Map<String, dynamic> data, String docId) {
   );
 }
 
+// ==================== FRONTEND: Main Screen Widget ====================
+
 class MyRecipesScreen extends StatefulWidget {
   const MyRecipesScreen({
     super.key,
@@ -88,7 +99,7 @@ class MyRecipesScreen extends StatefulWidget {
   });
 
   final bool isDarkMode;
-  final ValueChanged<bool> onDarkModeChanged;
+  final ValueChanged<bool> onDarkModeChanged; // Callback for theme changes
 
   @override
   State<MyRecipesScreen> createState() => _MyRecipesScreenState();
@@ -96,33 +107,39 @@ class MyRecipesScreen extends StatefulWidget {
 
 class _MyRecipesScreenState extends State<MyRecipesScreen>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+  late TabController _tabController; // Manages History/Favorites tabs
 
+  // INITIALIZATION LOGIC
   @override
   void initState() {
     super.initState();
+    // Initialize tab controller with 2 tabs (History, Favorites)
     _tabController = TabController(length: 2, vsync: this);
+    // Add listener to rebuild UI when tab changes
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
   }
 
+  // CLEANUP LOGIC
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController.dispose(); // Prevent memory leaks
     super.dispose();
   }
 
+  // THEME LOGIC: Toggle dark mode through parent callback
   void _toggleDarkMode() {
-    // Call the parent's callback to update dark mode globally
     widget.onDarkModeChanged(!widget.isDarkMode);
   }
 
+  // FRONTEND: Main UI Builder
   @override
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
     final userId = currentUser?.uid;
 
+    // AUTHENTICATION CHECK: Redirect if user not logged in
     if (userId == null) {
       return Scaffold(
         backgroundColor: widget.isDarkMode ? const Color(0xFF121212) : const Color(0xFFF3E8DF),
@@ -134,8 +151,12 @@ class _MyRecipesScreenState extends State<MyRecipesScreen>
 
     return Scaffold(
       backgroundColor: widget.isDarkMode ? const Color(0xFF121212) : const Color(0xFFF3E8DF),
+      // FIXED SCROLLING: Using CustomScrollView with proper sliver configuration
+      // This ensures all content scrolls properly including the hero header
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(), // Smooth scrolling physics
         slivers: [
+          // SLIVER 1: Hero Header Section (User info and actions)
           SliverToBoxAdapter(
             child: _MyRecipesHero(
               isDarkMode: widget.isDarkMode,
@@ -152,6 +173,8 @@ class _MyRecipesScreenState extends State<MyRecipesScreen>
               onDarkModeToggle: _toggleDarkMode,
             ),
           ),
+
+          // SLIVER 2: Custom Tab Bar (Animated selection indicator)
           SliverToBoxAdapter(
             child: Container(
               margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -159,13 +182,13 @@ class _MyRecipesScreenState extends State<MyRecipesScreen>
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: widget.isDarkMode
-                      ? const Color(0xFF2C2C2C).withValues(alpha: 0.88)
-                      : Colors.white.withValues(alpha: 0.88),
+                      ? const Color(0xFF2C2C2C).withOpacity(0.88)
+                      : Colors.white.withOpacity(0.88),
                   borderRadius: BorderRadius.circular(28),
                   border: Border.all(color: widget.isDarkMode ? const Color(0xFF444444) : const Color(0xFFE7E5FF)),
                   boxShadow: [
                     BoxShadow(
-                      color: (widget.isDarkMode ? const Color(0xFF000000) : const Color(0xFFCB6B2E)).withValues(alpha: 0.08),
+                      color: (widget.isDarkMode ? const Color(0xFF000000) : const Color(0xFFCB6B2E)).withOpacity(0.08),
                       blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),
@@ -173,6 +196,7 @@ class _MyRecipesScreenState extends State<MyRecipesScreen>
                 ),
                 child: Row(
                   children: [
+                    // History Tab Button
                     Expanded(
                       child: GestureDetector(
                         onTap: () => _tabController.animateTo(0),
@@ -201,6 +225,7 @@ class _MyRecipesScreenState extends State<MyRecipesScreen>
                         ),
                       ),
                     ),
+                    // Favorites Tab Button
                     Expanded(
                       child: GestureDetector(
                         onTap: () => _tabController.animateTo(1),
@@ -234,6 +259,10 @@ class _MyRecipesScreenState extends State<MyRecipesScreen>
               ),
             ),
           ),
+
+          // SLIVER 3: Tab Content (History & Favorites lists)
+          // FIXED SCROLLING: Using SliverFillRemaining with TabBarView
+          // This ensures the content expands to fill remaining space and scrolls properly
           SliverFillRemaining(
             child: TabBarView(
               controller: _tabController,
@@ -249,6 +278,9 @@ class _MyRecipesScreenState extends State<MyRecipesScreen>
   }
 }
 
+// ==================== BACKEND + FRONTEND: History Tab ====================
+// Displays user's cooking history from Firestore started_recipes collection
+
 class _HistoryTab extends StatelessWidget {
   const _HistoryTab({required this.userId, required this.isDarkMode});
 
@@ -257,6 +289,8 @@ class _HistoryTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // BACKEND: Real-time Firestore stream for started recipes
+    // Orders by startedAt timestamp descending (newest first)
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('users')
@@ -265,6 +299,7 @@ class _HistoryTab extends StatelessWidget {
           .orderBy('startedAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
+        // ERROR HANDLING: Display error message if stream fails
         if (snapshot.hasError) {
           return Center(
             child: Column(
@@ -282,6 +317,7 @@ class _HistoryTab extends StatelessWidget {
           );
         }
 
+        // LOADING STATE: Show spinner while fetching data
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: CircularProgressIndicator(color: Color(0xFFCB6B2E)),
@@ -290,12 +326,13 @@ class _HistoryTab extends StatelessWidget {
 
         final recipes = snapshot.data?.docs ?? [];
 
+        // EMPTY STATE: Show message when no history exists
         if (recipes.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.history, size: 64, color: const Color(0xFFCB6B2E).withValues(alpha: 0.7)),
+                Icon(Icons.history, size: 64, color: const Color(0xFFCB6B2E).withOpacity(0.7)),
                 const SizedBox(height: 16),
                 Text(
                   'No recipes in history yet',
@@ -319,9 +356,16 @@ class _HistoryTab extends StatelessWidget {
           );
         }
 
+        // FRONTEND: Render scrollable list of recipe cards
+        // FIXED SCROLLING: ListView with proper padding and scroll physics, plus bottom padding to clear navbar
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            140, // extra bottom space so last recipe is above navbar
+          ), // Extra bottom padding for navbar
+          physics: const AlwaysScrollableScrollPhysics(), // Enables smooth scrolling
           itemCount: recipes.length,
           itemBuilder: (context, index) {
             final doc = recipes[index];
@@ -344,6 +388,9 @@ class _HistoryTab extends StatelessWidget {
   }
 }
 
+// ==================== BACKEND + FRONTEND: Favorites Tab ====================
+// Displays user's favorite recipes from Firestore favorite_recipes collection
+
 class _FavoritesTab extends StatelessWidget {
   const _FavoritesTab({required this.userId, required this.isDarkMode});
 
@@ -352,6 +399,7 @@ class _FavoritesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // BACKEND: Real-time Firestore stream for favorite recipes
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('users')
@@ -359,6 +407,7 @@ class _FavoritesTab extends StatelessWidget {
           .collection('favorite_recipes')
           .snapshots(),
       builder: (context, snapshot) {
+        // ERROR HANDLING
         if (snapshot.hasError) {
           return Center(
             child: Column(
@@ -372,29 +421,32 @@ class _FavoritesTab extends StatelessWidget {
           );
         }
 
+        // LOADING STATE
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: CircularProgressIndicator(color: Color(0xFFCB6B2E)),
           );
         }
 
+        // BACKEND: Sort favorites by savedAt timestamp (newest first)
         final recipes = List<QueryDocumentSnapshot>.from(
           snapshot.data?.docs ?? const [],
         )..sort((a, b) {
-            final aSaved = (a.data() as Map<String, dynamic>)['savedAt'];
-            final bSaved = (b.data() as Map<String, dynamic>)['savedAt'];
-            if (aSaved is Timestamp && bSaved is Timestamp) {
-              return bSaved.compareTo(aSaved);
-            }
-            return 0;
-          });
+          final aSaved = (a.data() as Map<String, dynamic>)['savedAt'];
+          final bSaved = (b.data() as Map<String, dynamic>)['savedAt'];
+          if (aSaved is Timestamp && bSaved is Timestamp) {
+            return bSaved.compareTo(aSaved);
+          }
+          return 0;
+        });
 
+        // EMPTY STATE
         if (recipes.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.favorite_border, size: 64, color: const Color(0xFFCB6B2E).withValues(alpha: 0.7)),
+                Icon(Icons.favorite_border, size: 64, color: const Color(0xFFCB6B2E).withOpacity(0.7)),
                 const SizedBox(height: 16),
                 Text(
                   'No favorite recipes yet',
@@ -418,10 +470,16 @@ class _FavoritesTab extends StatelessWidget {
           );
         }
 
+        // FRONTEND: Render scrollable list of favorite recipe cards
+        // FIXED SCROLLING: ListView with proper padding and scroll physics, plus bottom padding to clear navbar
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          physics: const AlwaysScrollableScrollPhysics(),
-          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            140, // extra bottom space so last recipe is above navbar
+          ), // Extra bottom padding for navbar
+          physics: const AlwaysScrollableScrollPhysics(), // Enables smooth scrolling
           itemCount: recipes.length,
           itemBuilder: (context, index) {
             final doc = recipes[index];
@@ -442,6 +500,9 @@ class _FavoritesTab extends StatelessWidget {
     );
   }
 }
+
+// ==================== FRONTEND: Recipe Card Widget ====================
+// Displays individual recipe information with favorite and remove actions
 
 class _RecipeCard extends StatefulWidget {
   const _RecipeCard({
@@ -465,17 +526,18 @@ class _RecipeCard extends StatefulWidget {
 }
 
 class _RecipeCardState extends State<_RecipeCard> {
-  final FavoriteRecipesService _favoriteRecipesService =
-      FavoriteRecipesService();
+  final FavoriteRecipesService _favoriteRecipesService = FavoriteRecipesService();
   bool _isFavorite = false;
   bool _isLoadingFavorite = false;
 
+  // INITIALIZATION: Check if recipe is already favorited
   @override
   void initState() {
     super.initState();
     _checkIfFavorite();
   }
 
+  // BACKEND: Check favorite status from Firestore
   Future<void> _checkIfFavorite() async {
     final doc = await FirebaseFirestore.instance
         .collection('users')
@@ -491,12 +553,14 @@ class _RecipeCardState extends State<_RecipeCard> {
     }
   }
 
+  // BACKEND: Toggle favorite status (add/remove from favorites)
   Future<void> _toggleFavorite() async {
     if (_isLoadingFavorite) return;
     setState(() => _isLoadingFavorite = true);
 
     try {
       if (_isFavorite) {
+        // Remove from favorites
         await _favoriteRecipesService.removeFavoriteRecipe(
           userId: widget.userId,
           recipeId: widget.recipe.id,
@@ -512,6 +576,7 @@ class _RecipeCardState extends State<_RecipeCard> {
           );
         }
       } else {
+        // Add to favorites
         await _favoriteRecipesService.saveFavoriteRecipe(
           userId: widget.userId,
           recipe: widget.recipe,
@@ -524,6 +589,7 @@ class _RecipeCardState extends State<_RecipeCard> {
         }
       }
     } catch (e) {
+      // ERROR HANDLING
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to update favorites'), backgroundColor: Colors.red),
@@ -534,7 +600,9 @@ class _RecipeCardState extends State<_RecipeCard> {
     }
   }
 
+  // BACKEND: Remove recipe from history
   Future<void> _removeFromHistory() async {
+    // Confirmation dialog before deletion
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -594,6 +662,7 @@ class _RecipeCardState extends State<_RecipeCard> {
     }
   }
 
+  // FRONTEND LOGIC: Format timestamp for display
   String _formatDate(Timestamp? timestamp) {
     if (timestamp == null) return 'Recently';
     final date = timestamp.toDate();
@@ -610,11 +679,13 @@ class _RecipeCardState extends State<_RecipeCard> {
     return '${date.month}/${date.day}/${date.year}';
   }
 
+  // FRONTEND: Recipe Card UI
   @override
   Widget build(BuildContext context) {
     final canMakeNow = widget.recipe.missedIngredientCount == 0;
 
     return GestureDetector(
+      // Navigate to recipe details on tap
       onTap: () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => RecipeDetailsScreen(recipe: widget.recipe)));
       },
@@ -623,13 +694,14 @@ class _RecipeCardState extends State<_RecipeCard> {
         decoration: BoxDecoration(
           color: widget.isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
           borderRadius: BorderRadius.circular(20),
+          // Highlight border for recipes that can be made immediately
           border: canMakeNow
               ? Border.all(color: const Color(0xFF9BEA7A), width: 1.5)
               : null,
           boxShadow: [
             BoxShadow(
-              color: (widget.isDarkMode ? Colors.black : Colors.black).withAlpha(
-                widget.isDarkMode ? 40 : 8,
+              color: (widget.isDarkMode ? Colors.black : Colors.black).withOpacity(
+                widget.isDarkMode ? 0.4 : 0.08,
               ),
               blurRadius: 8,
               offset: const Offset(0, 2),
@@ -638,6 +710,7 @@ class _RecipeCardState extends State<_RecipeCard> {
         ),
         child: Row(
           children: [
+            // Recipe Image (left side)
             ClipRRect(
               borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), bottomLeft: Radius.circular(20)),
               child: widget.recipe.image.isNotEmpty
@@ -651,7 +724,7 @@ class _RecipeCardState extends State<_RecipeCard> {
                     width: 100,
                     height: 100,
                     color: widget.isDarkMode ? const Color(0xFF1E1E1E) : const Color(0xFFF3E8DF),
-                    child: Icon(Icons.restaurant, size: 40, color: const Color(0xFFCB6B2E).withAlpha(100)),
+                    child: Icon(Icons.restaurant, size: 40, color: const Color(0xFFCB6B2E).withOpacity(0.4)),
                   );
                 },
               )
@@ -659,15 +732,17 @@ class _RecipeCardState extends State<_RecipeCard> {
                 width: 100,
                 height: 100,
                 color: widget.isDarkMode ? const Color(0xFF1E1E1E) : const Color(0xFFF3E8DF),
-                child: Icon(Icons.restaurant, size: 40, color: const Color(0xFFCB6B2E).withAlpha(100)),
+                child: Icon(Icons.restaurant, size: 40, color: const Color(0xFFCB6B2E).withOpacity(0.4)),
               ),
             ),
+            // Recipe Details (center)
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Recipe Title
                     Text(
                       widget.recipe.title,
                       style: TextStyle(
@@ -679,9 +754,10 @@ class _RecipeCardState extends State<_RecipeCard> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
+                    // Recipe Metadata (time, missing ingredients)
                     Row(
                       children: [
-                        Icon(Icons.timer_outlined, size: 14, color: const Color(0xFFCB6B2E).withAlpha(180)),
+                        Icon(Icons.timer_outlined, size: 14, color: const Color(0xFFCB6B2E).withOpacity(0.7)),
                         const SizedBox(width: 4),
                         Text(
                           '${widget.recipe.readyInMinutes} min',
@@ -693,8 +769,8 @@ class _RecipeCardState extends State<_RecipeCard> {
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: canMakeNow
-                                  ? const Color(0xFF9BEA7A).withAlpha(30)
-                                  : const Color(0xFFFFCF7A).withAlpha(30),
+                                  ? const Color(0xFF9BEA7A).withOpacity(0.3)
+                                  : const Color(0xFFFFCF7A).withOpacity(0.3),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
@@ -708,13 +784,14 @@ class _RecipeCardState extends State<_RecipeCard> {
                           ),
                       ],
                     ),
+                    // Timestamp (when added to history/favorites)
                     if (widget.timestamp != null) ...[
                       const SizedBox(height: 6),
                       Text(
                         _formatDate(widget.timestamp),
                         style: TextStyle(
                           fontSize: 11,
-                          color: (widget.isDarkMode ? Colors.white38 : const Color(0xFF8B7355)).withAlpha(150),
+                          color: (widget.isDarkMode ? Colors.white38 : const Color(0xFF8B7355)).withOpacity(0.6),
                         ),
                       ),
                     ],
@@ -722,18 +799,20 @@ class _RecipeCardState extends State<_RecipeCard> {
                 ),
               ),
             ),
+            // Action Buttons (Favorite & Remove)
             Padding(
               padding: const EdgeInsets.only(right: 8),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Favorite Toggle Button
                   GestureDetector(
                     onTap: _toggleFavorite,
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: _isFavorite
-                            ? const Color(0xFFCB6B2E).withAlpha(20)
+                            ? const Color(0xFFCB6B2E).withOpacity(0.2)
                             : Colors.transparent,
                         shape: BoxShape.circle,
                       ),
@@ -750,6 +829,7 @@ class _RecipeCardState extends State<_RecipeCard> {
                       ),
                     ),
                   ),
+                  // Remove from History Button (only visible in History tab)
                   if (widget.isHistory)
                     GestureDetector(
                       onTap: _removeFromHistory,
@@ -772,6 +852,9 @@ class _RecipeCardState extends State<_RecipeCard> {
   }
 }
 
+// ==================== FRONTEND: Hero Header Widget ====================
+// Displays user avatar, greeting, and action buttons
+
 class _MyRecipesHero extends StatelessWidget {
   const _MyRecipesHero({
     required this.isDarkMode,
@@ -785,6 +868,7 @@ class _MyRecipesHero extends StatelessWidget {
   final VoidCallback onSettingsTap;
   final VoidCallback onDarkModeToggle;
 
+  // Helper: Extract first name from full name
   String? _extractFirstName(String? displayName) {
     final value = (displayName ?? '').trim();
     if (value.isEmpty) return null;
@@ -799,10 +883,9 @@ class _MyRecipesHero extends StatelessWidget {
     final isCompact = isLandscape;
     final heroTitleSize = isCompact ? 16.0 : 23.0;
     final searchBg = isDarkMode ? const Color(0xFF2A2A2A) : Colors.white;
-    final searchHintColor = isDarkMode
-        ? const Color(0xFF9A9A9A)
-        : const Color(0xFF888888);
+    final searchHintColor = isDarkMode ? const Color(0xFF9A9A9A) : const Color(0xFF888888);
 
+    // BACKEND: Stream user data from Firestore
     return StreamBuilder<DocumentSnapshot>(
       stream: currentUser == null ? null : FirebaseFirestore.instance.collection('users').doc(currentUser.uid).snapshots(),
       builder: (context, userSnapshot) {
@@ -810,6 +893,7 @@ class _MyRecipesHero extends StatelessWidget {
         String? profileImageUrl;
         String? profileImageLocalPath;
 
+        // Parse user data if available
         if (currentUser != null) {
           final data = userSnapshot.data?.data() as Map<String, dynamic>?;
           final firstName = (data?['firstName'] as String?)?.trim();
@@ -819,6 +903,7 @@ class _MyRecipesHero extends StatelessWidget {
           profileImageLocalPath = (data?['profileImageLocalPath'] as String?)?.trim();
         }
 
+        // FRONTEND: Hero UI with gradient background and decorative patterns
         return Container(
           width: double.infinity,
           padding: EdgeInsets.fromLTRB(
@@ -845,6 +930,7 @@ class _MyRecipesHero extends StatelessWidget {
           ),
           child: Stack(
             children: [
+              // Decorative background patterns
               Positioned.fill(
                 child: IgnorePointer(
                   child: CustomPaint(painter: _MyRecipesHeroBackgroundPainter()),
@@ -853,52 +939,60 @@ class _MyRecipesHero extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: onProfileTap,
-                    child: CurrentUserAvatar(
-                      size: 40,
-                      onTap: onProfileTap,
-                      overrideImageUrl: profileImageUrl,
-                      overrideLocalPath: profileImageLocalPath,
-                      backgroundColor: isDarkMode ? const Color(0xFF444444) : const Color(0xFFD28E18),
-                      borderColor: Colors.white.withValues(alpha: 0.65),
-                      borderWidth: 2,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          displayName,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontWeight: FontWeight.w600,
-                          ),
+                  // Top Row: Avatar + User Info + Action Buttons
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: onProfileTap,
+                        child: CurrentUserAvatar(
+                          size: 40,
+                          onTap: onProfileTap,
+                          overrideImageUrl: profileImageUrl,
+                          overrideLocalPath: profileImageLocalPath,
+                          backgroundColor: isDarkMode ? const Color(0xFF444444) : const Color(0xFFD28E18),
+                          borderColor: Colors.white.withOpacity(0.65),
+                          borderWidth: 2,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Your recipe collection',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.75),
-                          ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.white.withOpacity(0.9),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Your recipe collection',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.white.withOpacity(0.75),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      // Theme Toggle Button
+                      _CircleActionButton(
+                        icon: isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                        onTap: onDarkModeToggle,
+                        isDarkMode: isDarkMode,
+                      ),
+                      const SizedBox(width: 8),
+                      // Settings Button
+                      _CircleActionButton(
+                        icon: Icons.settings_outlined,
+                        onTap: onSettingsTap,
+                        isDarkMode: isDarkMode,
+                      ),
+                    ],
                   ),
-                  _CircleActionButton(
-                    icon: isDarkMode ? Icons.light_mode : Icons.dark_mode,
-                    onTap: onDarkModeToggle,
-                    isDarkMode: isDarkMode,
-                  ),
-                  const SizedBox(width: 8),
-                  _CircleActionButton(icon: Icons.settings_outlined, onTap: onSettingsTap, isDarkMode: isDarkMode),
-                ],
-              ),
                   SizedBox(height: isCompact ? 6 : 26),
+                  // Hero Title
                   Text(
                     'My Recipes',
                     style: TextStyle(
@@ -921,6 +1015,7 @@ class _MyRecipesHero extends StatelessWidget {
                     ),
                   ],
                   SizedBox(height: isCompact ? 8 : 25),
+                  // Search Bar (UI only - placeholder for future functionality)
                   Container(
                     height: isCompact ? 40 : 50,
                     padding: const EdgeInsets.only(left: 16, right: 6),
@@ -929,7 +1024,7 @@ class _MyRecipesHero extends StatelessWidget {
                       borderRadius: BorderRadius.circular(27),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: isDarkMode ? 0.35 : 0.12),
+                          color: Colors.black.withOpacity(isDarkMode ? 0.35 : 0.12),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -958,7 +1053,7 @@ class _MyRecipesHero extends StatelessWidget {
                           width: 38,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: AppColors.primary.withValues(alpha: 0.14),
+                            color: AppColors.primary.withOpacity(0.14),
                           ),
                           child: const Icon(
                             Icons.tune_rounded,
@@ -980,8 +1075,15 @@ class _MyRecipesHero extends StatelessWidget {
   }
 }
 
+// ==================== FRONTEND: Circular Action Button Widget ====================
+// Reusable circular button for header actions
+
 class _CircleActionButton extends StatelessWidget {
-  const _CircleActionButton({required this.icon, required this.onTap, required this.isDarkMode});
+  const _CircleActionButton({
+    required this.icon,
+    required this.onTap,
+    required this.isDarkMode,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
@@ -998,27 +1100,50 @@ class _CircleActionButton extends StatelessWidget {
           color: isDarkMode ? const Color(0xFF444444) : Colors.white,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: isDarkMode ? Colors.white70 : const Color(0xFF6C6C6C), size: 21),
+        child: Icon(
+          icon,
+          color: isDarkMode ? Colors.white70 : const Color(0xFF6C6C6C),
+          size: 21,
+        ),
       ),
     );
   }
 }
 
+// ==================== FRONTEND: Custom Background Painter ====================
+// Draws decorative arc patterns in the hero header background
+
 class _MyRecipesHeroBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final ringPaint = Paint()..style = PaintingStyle.stroke..strokeCap = StrokeCap.round;
-    ringPaint..color = Colors.white.withValues(alpha: 0.08)..strokeWidth = 34;
+    final ringPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // Draw first decorative ring (larger, more transparent)
+    ringPaint
+      ..color = Colors.white.withOpacity(0.08)
+      ..strokeWidth = 34;
     canvas.drawArc(
-      Rect.fromCircle(center: Offset(size.width * 0.92, size.height * 0.20), radius: size.height * 1.02),
+      Rect.fromCircle(
+        center: Offset(size.width * 0.92, size.height * 0.20),
+        radius: size.height * 1.02,
+      ),
       math.pi * 0.58,
       math.pi * 0.58,
       false,
       ringPaint,
     );
-    ringPaint..color = Colors.white.withValues(alpha: 0.05)..strokeWidth = 20;
+
+    // Draw second decorative ring (smaller, less transparent)
+    ringPaint
+      ..color = Colors.white.withOpacity(0.05)
+      ..strokeWidth = 20;
     canvas.drawArc(
-      Rect.fromCircle(center: Offset(size.width * 1.02, size.height * 0.06), radius: size.height * 0.86),
+      Rect.fromCircle(
+        center: Offset(size.width * 1.02, size.height * 0.06),
+        radius: size.height * 0.86,
+      ),
       math.pi * 0.52,
       math.pi * 0.52,
       false,

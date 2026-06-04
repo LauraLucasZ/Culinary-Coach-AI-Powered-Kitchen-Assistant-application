@@ -3,21 +3,33 @@ import 'package:flutter/foundation.dart';
 
 class AuthController extends ChangeNotifier {
   AuthController({AuthService? authService})
-    : _authService = authService ?? AuthService();
+      : _authService = authService ?? AuthService();
 
   final AuthService _authService;
 
   bool _isLoading = false;
   String? _errorMessage;
+  bool _isAdmin = false; // Add this to track admin status
 
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get isAdmin => _isAdmin; // Add this getter
 
   Future<bool> login({required String email, required String password}) async {
     _setLoading(true);
     _setError(null);
+    _isAdmin = false; // Reset admin status
     try {
-      await _authService.signIn(email: email.trim(), password: password.trim());
+      final userCredential = await _authService.signIn(
+          email: email.trim(),
+          password: password.trim()
+      );
+
+      // Check if the logged-in user is admin
+      if (userCredential.user != null) {
+        _isAdmin = await _authService.isAdminUser(userCredential.user!);
+      }
+
       return true;
     } on AuthFailure catch (e) {
       _setError(e.message);
@@ -76,8 +88,15 @@ class AuthController extends ChangeNotifier {
   Future<bool> signInWithGoogle() async {
     _setLoading(true);
     _setError(null);
+    _isAdmin = false; // Reset admin status
     try {
-      await _authService.signInWithGoogle();
+      final userCredential = await _authService.signInWithGoogle();
+
+      // Check if the logged-in user is admin (though Google users won't be admin by default)
+      if (userCredential.user != null) {
+        _isAdmin = await _authService.isAdminUser(userCredential.user!);
+      }
+
       return true;
     } on AuthFailure catch (e) {
       _setError(e.message);
@@ -92,6 +111,7 @@ class AuthController extends ChangeNotifier {
     _setError(null);
     try {
       await _authService.signOut();
+      _isAdmin = false; // Reset admin status on logout
     } on AuthFailure catch (e) {
       _setError(e.message);
     } catch (_) {

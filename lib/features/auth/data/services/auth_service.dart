@@ -1,3 +1,5 @@
+// lib/features/auth/data/services/auth_service.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:culinary_coach_app/core/utils/text_keywords.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -5,19 +7,19 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthFailure implements Exception {
   const AuthFailure(this.message);
-
   final String message;
 }
 
 class AuthService {
   AuthService({FirebaseAuth? auth, FirebaseFirestore? firestore})
-    : _auth = auth ?? FirebaseAuth.instance,
-      _firestore = firestore ?? FirebaseFirestore.instance;
+      : _auth = auth ?? FirebaseAuth.instance,
+        _firestore = firestore ?? FirebaseFirestore.instance;
 
-  // Web client ID from Firebase google-services.json (client_type: 3).
-  // Passing it explicitly avoids runtime lookup failures on some setups.
   static const String _androidServerClientId =
       '308730893669-dph9hlvnglp8m9n356qph85sd5bnkog3.apps.googleusercontent.com';
+
+  static const String _adminEmail = 'admin1@gmail.com';
+  static const String _adminPassword = 'Admin123@';
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
@@ -26,6 +28,19 @@ class AuthService {
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
   User? get currentUser => _auth.currentUser;
+
+  Future<bool> isAdminUser(User user) async {
+    try {
+      final doc = await _firestore.collection('users').doc(user.uid).get();
+      final data = doc.data();
+      final role = data?['role'] as String?;
+      print('Admin check for ${user.email}: role = $role');
+      return role == 'admin';
+    } catch (e) {
+      print('Error checking admin: $e');
+      return false;
+    }
+  }
 
   Future<UserCredential> signIn({
     required String email,
@@ -40,6 +55,13 @@ class AuthService {
       final split = _splitName(
         credential.user?.displayName ?? _fallbackNameFromEmail(resolvedEmail),
       );
+
+      // Check if this is the admin account
+      final isAdminUser = email.toLowerCase().trim() == _adminEmail && password == _adminPassword;
+      final role = isAdminUser ? 'admin' : 'user';
+
+      print('Signing in: $email, isAdminUser: $isAdminUser, role: $role');
+
       await _saveUserRecordSafely(
         uid: credential.user?.uid,
         firstName: split.firstName,
@@ -49,6 +71,7 @@ class AuthService {
         gender: null,
         authProvider: _resolveAuthProvider(credential.user),
         overwriteNames: false,
+        role: role,
       );
       return credential;
     } on FirebaseAuthException catch (e) {
@@ -81,6 +104,7 @@ class AuthService {
         gender: null,
         authProvider: 'password',
         overwriteNames: true,
+        role: 'user', // New users are always regular users
       );
       return credential;
     } on FirebaseAuthException catch (e) {
@@ -123,6 +147,7 @@ class AuthService {
         gender: null,
         authProvider: 'google',
         overwriteNames: false,
+        role: 'user', // Google sign-in users are regular users
       );
       return userCredential;
     } on FirebaseAuthException catch (e) {
@@ -145,13 +170,10 @@ class AuthService {
       throw const AuthFailure('Could not sign out. Please try again.');
     }
 
-    // Google sign-out should not block app logout if it fails.
     if (_isGoogleInitialized) {
       try {
         await _googleSignIn.signOut();
-      } catch (_) {
-        // Intentionally ignored.
-      }
+      } catch (_) {}
     }
   }
 
@@ -170,6 +192,7 @@ class AuthService {
       gender: null,
       authProvider: _resolveAuthProvider(user),
       overwriteNames: false,
+      role: 'user', // Default role for existing sessions
     );
   }
 
@@ -188,20 +211,27 @@ class AuthService {
     required String? gender,
     required String authProvider,
     required bool overwriteNames,
+    required String role,
   }) async {
     if (uid == null || uid.isEmpty) return;
 
     final doc = _firestore.collection('users').doc(uid);
     final existing = await doc.get();
     final existingData = existing.data() ?? const <String, dynamic>{};
+
+    // Only update role if it doesn't exist or if we're setting admin
+    final existingRole = existingData['role'] as String?;
+    final finalRole = (role == 'admin' || existingRole == 'admin') ? 'admin' : role;
+
     final payload = <String, dynamic>{
       'uid': uid,
-      'email': email,
+      'email': email.toLowerCase().trim(),
       'birthDate': birthDate == null ? null : Timestamp.fromDate(birthDate),
       'gender': gender,
       'authProvider': authProvider,
       'updatedAt': FieldValue.serverTimestamp(),
       'fullName': FieldValue.delete(),
+      'role': finalRole,
     };
 
     final shouldSetFirstName =
@@ -235,6 +265,7 @@ class AuthService {
     }
 
     await doc.set(payload, SetOptions(merge: true));
+    print('Saved user record for $uid with role: $finalRole');
   }
 
   Future<void> _saveUserRecordSafely({
@@ -246,6 +277,7 @@ class AuthService {
     required String? gender,
     required String authProvider,
     required bool overwriteNames,
+    required String role,
   }) async {
     try {
       await _saveUserRecord(
@@ -257,9 +289,10 @@ class AuthService {
         gender: gender,
         authProvider: authProvider,
         overwriteNames: overwriteNames,
+        role: role,
       );
-    } catch (_) {
-      // Non-blocking: auth flow should continue even if Firestore sync fails.
+    } catch (e) {
+      print('Error saving user record: $e');
     }
   }
 
@@ -280,10 +313,10 @@ class AuthService {
         .split(RegExp(r'[._-]+'))
         .where((part) => part.trim().isNotEmpty)
         .map((part) {
-          final value = part.trim();
-          if (value.isEmpty) return value;
-          return value[0].toUpperCase() + value.substring(1).toLowerCase();
-        })
+      final value = part.trim();
+      if (value.isEmpty) return value;
+      return value[0].toUpperCase() + value.substring(1).toLowerCase();
+    })
         .toList();
     if (words.isEmpty) return 'Chef';
     return words.join(' ');
@@ -296,8 +329,8 @@ class AuthService {
     if (parts.isEmpty) return (firstName: null, lastName: null);
     if (parts.length == 1) return (firstName: parts.first, lastName: null);
     return (
-      firstName: parts.first,
-      lastName: parts.sublist(1).join(' '),
+    firstName: parts.first,
+    lastName: parts.sublist(1).join(' '),
     );
   }
 
@@ -330,11 +363,11 @@ class AuthService {
         return 'Google sign-in was cancelled.';
       case GoogleSignInExceptionCode.clientConfigurationError:
       case GoogleSignInExceptionCode.providerConfigurationError:
-        return 'Google Sign-In is not configured correctly in Firebase/Android setup.';
+        return 'Google Sign-In is not configured correctly.';
       case GoogleSignInExceptionCode.uiUnavailable:
-        return 'Google sign-in UI is unavailable right now. Try again.';
+        return 'Google sign-in UI is unavailable right now.';
       case GoogleSignInExceptionCode.interrupted:
-        return 'Google sign-in was interrupted. Please retry.';
+        return 'Google sign-in was interrupted.';
       default:
         final details = e.description?.trim();
         if (details != null && details.isNotEmpty) {

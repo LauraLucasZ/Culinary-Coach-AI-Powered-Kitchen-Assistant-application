@@ -1,3 +1,4 @@
+import 'package:culinary_coach_app/features/admin/presentation/screens/admin_shell_screen.dart';
 import 'package:culinary_coach_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:culinary_coach_app/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:culinary_coach_app/features/onboarding/presentation/screens/onboarding_screen.dart';
@@ -9,6 +10,7 @@ class AppRouter {
   static const String login = '/login';
   static const String signUp = '/sign-up';
   static const String shell = '/shell';
+  static const String admin = '/admin';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -18,6 +20,8 @@ class AppRouter {
         return MaterialPageRoute<void>(builder: (_) => const SignUpScreen());
       case shell:
         return MaterialPageRoute<void>(builder: (_) => const MainShellScreen());
+      case admin:
+        return MaterialPageRoute<void>(builder: (_) => const AdminShellScreen());
       case onboarding:
       default:
         final initialPageArg = settings.arguments;

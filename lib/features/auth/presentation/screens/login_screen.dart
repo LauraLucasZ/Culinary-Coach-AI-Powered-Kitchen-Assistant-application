@@ -28,26 +28,37 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    // delegate sign in logic to auth controller
     final ok = await _authController.login(
       email: _emailController.text,
       password: _passwordController.text,
     );
 
     if (!mounted) return;
+
     if (ok) {
-      // clear auth screens from stack and open main shell
-      Navigator.pushNamedAndRemoveUntil(context, AppRouter.shell, (_) => false);
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        _authController.isAdmin
+            ? AppRouter.admin
+            : AppRouter.shell,
+            (_) => false,
+      );
     }
   }
 
   Future<void> _continueWithGoogle() async {
-    // same success path as email login, but through google provider
     final ok = await _authController.signInWithGoogle();
+
     if (!mounted) return;
 
     if (ok) {
-      Navigator.pushNamedAndRemoveUntil(context, AppRouter.shell, (_) => false);
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        _authController.isAdmin
+            ? AppRouter.admin
+            : AppRouter.shell,
+            (_) => false,
+      );
     }
   }
 
