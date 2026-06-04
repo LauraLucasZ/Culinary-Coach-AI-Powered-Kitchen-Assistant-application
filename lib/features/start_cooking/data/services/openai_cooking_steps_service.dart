@@ -39,12 +39,15 @@ class OpenAiCookingStepsService {
     required List<String> availableGifAssetPaths,
   }) async {
     final fallback = _localFallbackPlan(instructions);
+    //converts full paths into file names
     final availableGifFileNames = availableGifAssetPaths
         .map((path) => path.split('/').last)
         .toSet();
+    //map for forgiving matching
     final normalizedGifNameMap = <String, String>{
       for (final name in availableGifFileNames) _normalizeGifFileName(name): name,
     };
+    //if there is no openai key, return local fallback
     if (_apiKey.trim().isEmpty) return fallback;
 
     final compactInput = instructions
@@ -151,7 +154,7 @@ class OpenAiCookingStepsService {
     }
   }
 
-  // this keeps compatibility for call sites that only need cleaned step text
+  // old, this keeps compatibility for call sites that only need cleaned step text
   Future<List<String>> cleanInstructionSteps({
     required List<String> instructions,
     required String recipeTitle,
@@ -164,7 +167,7 @@ class OpenAiCookingStepsService {
     return plan.stepTexts;
   }
 
-  // this parses strict json or json inside markdown response
+  // this parses/decodes strict json or json inside markdown response
   CleanedCookingPlan _extractPlanFromContent({
     required String content,
     required Set<String> availableGifFileNames,

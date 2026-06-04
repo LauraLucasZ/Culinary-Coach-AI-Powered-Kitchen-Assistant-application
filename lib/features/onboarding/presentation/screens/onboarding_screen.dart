@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 // google_fonts still used by story slides and sign-up CTA
 
-// ─── Root ─────────────────────────────────────────────────────────────────────
+// Root
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key, this.initialPage = 0});
@@ -139,11 +139,11 @@ class _OnboardingPageState extends State<OnboardingScreen> {
   }
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// Constants
 
 const Color _kBg = Color(0xFFF3E8DF);
 
-// ─── Splash ───────────────────────────────────────────────────────────────────
+// Splash
 
 class _SplashSlide extends StatelessWidget {
   const _SplashSlide({required this.onNext});
@@ -223,7 +223,7 @@ class _SplashSlide extends StatelessWidget {
   }
 }
 
-// ─── Story slide ──────────────────────────────────────────────────────────────
+//  Story slide
 
 class _StorySlide extends StatelessWidget {
   const _StorySlide({

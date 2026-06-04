@@ -49,11 +49,13 @@ class CookingStepMediaMatcher {
 
   // this is the main method called from the screen to get one gif path for one step
   Future<String> matchForStep(String stepText) async {
+    //loads the GIFs
     final assets = await _loadAssets();
     if (assets.isEmpty) return _fallbackAsset;
 
     final normalizedStep = _normalize(stepText);
     if (normalizedStep.isEmpty) return _pickFallbackAsset(assets);
+    //gets the important words by tokenization
     final stepTokens = _tokenize(normalizedStep);
 
     String bestAsset = assets.first;
@@ -92,7 +94,7 @@ class CookingStepMediaMatcher {
               .where((path) => path.toLowerCase().endsWith('.gif'))
               .toList()
             ..sort();
-
+      //saves the list in memory
       _cachedAssets = assets;
       return _cachedAssets!;
     } catch (_) {
@@ -107,6 +109,7 @@ class CookingStepMediaMatcher {
     required Set<String> stepTokens,
     required String assetPath,
   }) {
+    //gets the GIF file name and tokenizes it
     final assetName = assetPath.split('/').last;
     final normalizedAsset = _normalize(assetName);
     final assetTokens = _tokenize(normalizedAsset);

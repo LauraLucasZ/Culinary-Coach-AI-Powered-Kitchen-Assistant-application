@@ -236,6 +236,9 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
         .toSet();
 
     _selectedMissingIngredientKeys.removeWhere((k) => !missingKeys.contains(k));
+    //If nothing is selected yet, it selects all missing ingredients by default.
+    // So when the user first opens the details screen, all missing ingredients are
+    // selected by default and automatically checked.
     if (_selectedMissingIngredientKeys.isEmpty && missingKeys.isNotEmpty) {
       _selectedMissingIngredientKeys.addAll(missingKeys);
     }
@@ -244,14 +247,18 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
   // this toggles one missing ingredient selected state for add to cart
   void _toggleMissingIngredientSelection(String key) {
     setState(() {
+      //If the ingredient is selected, remove it
       if (_selectedMissingIngredientKeys.contains(key)) {
         _selectedMissingIngredientKeys.remove(key);
+       //If it is not selected, add it
       } else {
         _selectedMissingIngredientKeys.add(key);
       }
     });
   }
 
+  //When the user presses add to cart,
+  // the app needs to find the missing ingredient inside shop ingredient database
   IngredientModel? _bestIngredientMatch(
     String missingName,
     List<IngredientModel> allIngredients,
@@ -263,7 +270,9 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     for (final ingredient in allIngredients) {
       final nameNorm = _normalizeIngredientText(ingredient.name);
       if (nameNorm.isEmpty) continue;
+      //First it checks exact match
       if (nameNorm == missingNorm) return ingredient;
+      //If exact match is not found, it accepts partial match
       if (nameNorm.contains(missingNorm) || missingNorm.contains(nameNorm)) {
         partial ??= ingredient;
       }
@@ -281,6 +290,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
       );
       return;
     }
+    //from all missing ingredients, keep only the ones the user checked
     final selectedMissing = missing.where((name) {
       final key = _normalizeIngredientText(name);
       return key.isNotEmpty && _selectedMissingIngredientKeys.contains(key);
@@ -295,21 +305,31 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
     }
 
     try {
+      //this gets all ingredients from the shop database
       final allIngredients = await _ingredientService.getAllIngredients().first;
+      //This gets extra details like amount and unit
       final detailByKey = _missingIngredientDetailsByKey();
       int addedCount = 0;
 
+      //The main loop
       for (final missingName in selectedMissing) {
         final missingKey = _normalizeIngredientText(missingName);
         final match = _bestIngredientMatch(missingName, allIngredients);
+        //If no matching ingredient exists, skip this ingredient
         if (match == null) continue;
+        //This tries to get the amount/unit for the missing ingredient
         final detail = detailByKey[missingKey];
+        //This calculates the quantity to add to cart
+        // If there is no amount, use 1.0
+        // If there is an amount, adjust it based on:
+        // recipe amount * serving scale * ingredient scale
         final scaledAmount = detail?.amount == null
             ? 1.0
             : (detail!.amount! * _servingScaleFactor() * _ingredientScale).clamp(
                 0.1,
                 100.0,
               );
+        //saves to cart
         await _ingredientService.saveUserShopCartItem(
           userId: userId,
           ingredient: match,
@@ -328,6 +348,7 @@ class _RecipeDetailsScreenState extends State<RecipeDetailsScreen> {
           ),
         );
       } else if (context.mounted) {
+        //a dialog (popup) shows number of added ingredients if success
         await showDialog<void>(
           context: context,
           builder: (dialogContext) {
