@@ -9,44 +9,59 @@ The app combines recipe discovery, ingredient filtering, voice support, grocery 
 
 <p align="center">
   <img src="docs/screenshots/onboarding1.png" alt="Onboarding screen 1" width="220" />
-  <img src="docs/screenshots/onboarding2.png" alt="Onboarding screen 2" width="220" />
-  <img src="docs/screenshots/onboarding3.png" alt="Onboarding screen 3" width="220" />
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/onboarding4.png" alt="Onboarding screen 4" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;
   <img src="docs/screenshots/login.png" alt="login screen" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;
   <img src="docs/screenshots/signup.png" alt="Signup screen" width="220" />
 </p>
 
 <p align="center">
   <img src="docs/screenshots/home1.png" alt="Home screen" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;
   <img src="docs/screenshots/home2.png" alt="Home recipe recommendations screen" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;
   <img src="docs/screenshots/ingredients.png" alt="Ingredient filter screen" width="220" />
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/recipe-matches.png" alt="Recipe matches screen" width="220" />
   <img src="docs/screenshots/recipe-details.png" alt="Recipe details screen" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;
   <img src="docs/screenshots/start-cooking.png" alt="Start cooking guidance screen" width="220" />
 </p>
 
 
 <p align="center">
   <img src="docs/screenshots/shop.png" alt="Grocery shop screen" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;
   <img src="docs/screenshots/cart.png" alt="Cart screen" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;
   <img src="docs/screenshots/checkout.png" alt="Checkout screen" width="220" />
 </p>
 
 <p align="center">
   <img src="docs/screenshots/payment.png" alt="Payment screen" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;
   <img src="docs/screenshots/order-placed.png" alt="Order Placed screen" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;
   <img src="docs/screenshots/order-tracking.png" alt="Order tracking screen" width="220" />
 </p>
 
 <p align="center">
    <img src="docs/screenshots/my-recipes.png" alt="My recipes screen" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;
   <img src="docs/screenshots/community.png" alt="Community feed screen" width="220" />
+  &nbsp;&nbsp;&nbsp;
+  &nbsp;&nbsp;&nbsp;
   <img src="docs/screenshots/profile.png" alt="Profile screen" width="220" />
 </p>
 
