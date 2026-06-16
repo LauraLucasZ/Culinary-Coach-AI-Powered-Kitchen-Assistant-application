@@ -207,6 +207,19 @@ flutter build ios --release
 - Recipe discovery depends on Spoonacular API availability and quota.
 - AI cooking features depend on OpenAI API availability.
 
+
+## 👨‍💻 Team Members
+
+- [Laura Lucas](https://github.com/LauraLucasZ)
+
+- [Mariam Elbishbeashy](https://github.com/Mariam-Elbishbeashy)
+
+- [Aya Hisham](https://github.com/ayahisha)
+
+- [Mohamed Elrawy](https://github.com/MohamedIhabIbrahim22)
+
+- [Sondos Mohamed](https://github.com/SondosGafar)
+
 ## License
 
 This project was developed as a part of Mobile Device Programming course at Misr International University (MIU).
